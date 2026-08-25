@@ -9,6 +9,8 @@
   "scripts": {
     "dev:stdio": "tsx src/entrypoints/stdio.ts",
     "dev:http": "tsx src/entrypoints/http.ts",
+    "start:stdio": "node dist/entrypoints/stdio.js",
+    "start:http": "node dist/entrypoints/http.js",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
