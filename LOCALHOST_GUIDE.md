@@ -85,7 +85,7 @@ Open:
 http://127.0.0.1:7317/control-center
 ```
 
-The current CMS/operations surface is backed by real APIs. You can view live Overview/runtime state and add, edit, enable/disable or remove Project Registry entries. Removing a registry entry does not delete files on disk. MCP/Tools and Settings show the effective backend state. Permissions and Policies intentionally remain disabled until P2-T03/P2-T04 backend authorization is verified.
+The CMS/operations surface is backed by real APIs. You can manage Project Registry entries, issue/revoke temporary permission sessions and create/enable/disable/delete global or project-scoped authorization policies. Removing a registry entry does not delete files on disk. MCP/Tools and Settings show the effective backend state.
 
 Project Registry data persists by default in `.runtime/mcp-coding-v2.sqlite`. Override the database location with `MCP_DATABASE_PATH` when required.
 
@@ -99,11 +99,9 @@ http://127.0.0.1:7317/mcp
 
 The client must support modern MCP negotiation. The server targets MCP specification `2026-07-28`.
 
-The currently exposed MCP tool is:
+The currently exposed MCP surface includes `system_health` plus secure project filesystem tools: `read_file`, `stat_path`, `list_files`, `search_text`, `write_file`, `append_file`, `diff_file`, `apply_patch`, `batch_patch`, `copy_file`, `move_file` and `delete_file`.
 
-- `system_health` — read-only server health information.
-
-Project Registry and path-isolation foundations exist internally but are not yet exposed as project-management/filesystem MCP tools. Those capabilities will be added in later implementation phases.
+Filesystem tools require a registered project ID and a valid project-bound permission session with the corresponding read/write capability. Permission sessions can be issued from the Control Center. Existing-file writes/patches require the SHA-256 returned by `read_file`; this prevents silent overwrite of a file changed since the AI read it.
 
 ## 9. Use stdio instead of HTTP
 
@@ -209,4 +207,4 @@ Confirm in order:
 
 ## 15. Current limitations
 
-This repository is still in development. The localhost MCP service is usable for the currently implemented MCP surface, but it is not yet the final production system. Authentication/RBAC, permission sessions, policies, secure filesystem tool families, command runner, Brain, workflows and Git/browser/remote/deploy engines are still being implemented. The Control Center foundation exists now, but unfinished modules remain intentionally disabled until their backend is verified. See `STATUS.md`, `TASKS.md` and `PRODUCTION_READINESS_REPORT.md` for verified status.
+This repository is still in development. Local Project Registry, permission sessions/policies and the secure filesystem coding surface are implemented. The next priority is structured task/command execution, apply+verify and project/tool/skill discovery so an MCP client can work end-to-end on registered local projects. Production identity/RBAC, Brain/workflows, browser/remote/deploy and broader observability remain incomplete; Git MCP features are intentionally deferred. See `STATUS.md`, `TASKS.md` and `PRODUCTION_READINESS_REPORT.md` for verified status.

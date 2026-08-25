@@ -43,13 +43,17 @@ Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
 - [ ] P2.5-T03 Add audit/activity stream and operational diagnostics.
 
 ## EPIC P3 — Secure Filesystem
-- [~] P3-T01 Safe read/stat/list/search primitives.
-- [ ] P3-T02 Atomic create/write/append with size/binary/secret restrictions.
-- [ ] P3-T03 Patch/batch patch + diff + optimistic SHA-256 concurrency.
-- [ ] P3-T04 copy/move/delete with backup and symlink/traversal adversarial tests.
+- [x] P3-T01 Safe read/stat/list/search primitives.
+  - Evidence: authorized MCP read/stat/list/search tools, bounded traversal and text search; sensitive/binary/path-isolation tests PASS.
+- [x] P3-T02 Atomic create/write/append with size/binary/secret restrictions.
+  - Evidence: 1 MiB text bound, private-key/sensitive-path rejection, temp-file + rename writes and optimistic SHA-256 checks PASS.
+- [x] P3-T03 Patch/batch patch + diff + optimistic SHA-256 concurrency.
+  - Evidence: diff preview, exact patch and 1–20 change prevalidated batch patch with rollback attempt; concurrency/match-count tests PASS.
+- [x] P3-T04 copy/move/delete with backup and symlink/traversal adversarial tests.
+  - Evidence: copy/move destination guards, SHA-256 protected move/delete, persistent delete backup and junction/symlink escape rejection PASS.
 
 ## EPIC P4 — Command/Test Runner
-- [ ] P4-T01 Structured task profiles.
+- [~] P4-T01 Structured task profiles.
 - [ ] P4-T02 Process timeout/cancel/tree cleanup/output limits.
 - [ ] P4-T03 command policy + env allowlist + redaction + dangerous-command tests.
 

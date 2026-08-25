@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { AppConfig } from './config.js';
 import { AppError } from './errors.js';
 import { HealthService } from './health-service.js';
+import { mcpToolCatalog } from './mcp-tool-catalog.js';
 import { allCapabilities, capabilitySchema } from '../domain/authorization/capability.js';
 import type { PermissionSessionRepository } from '../domain/authorization/permission-session-repository.js';
 import { createPermissionSession, isPermissionSessionActive, type PermissionSession } from '../domain/authorization/permission-session.js';
@@ -81,7 +82,7 @@ export class ControlCenterService {
       counts: {
         projects: projects.length,
         activeProjects: projects.filter((project) => project.status === 'active').length,
-        tools: 1,
+        tools: mcpToolCatalog.length,
         permissionSessions: sessions.filter((session) => isPermissionSessionActive(session)).length,
         policies: (await this.policies.list()).length,
       },
@@ -111,13 +112,7 @@ export class ControlCenterService {
   }
 
   tools(): Array<Record<string, unknown>> {
-    return [{
-      name: 'system_health',
-      title: 'System health',
-      mode: 'read-only',
-      state: 'available',
-      description: 'Minimal non-sensitive MCP control-plane health snapshot.',
-    }];
+    return mcpToolCatalog.map((tool) => ({ ...tool, state: 'available' }));
   }
 
   settings(): Record<string, unknown> {

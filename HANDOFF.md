@@ -27,12 +27,16 @@ Strict TypeScript / Node ESM. MCP composition lives in `src/app/create-mcp-serve
 - temporary project-bound permission sessions with TTL/revoke and fixed capability catalog
 - global/project authorization policies with deny override semantics
 - real Permissions/Policies Control Center configuration
+- authorized Secure Filesystem tools over stdio + HTTP: read/stat/list/search/write/append/diff/patch/batch-patch/copy/move/delete
+- SHA-256 optimistic concurrency for destructive overwrites and exact patches
+- sensitive-path/private-key/binary/oversize blocking plus delete backups
+- end-to-end CMS permission/policy → MCP filesystem enforcement contract
 
 ## Current task
-P3-T01 secure filesystem read/stat/list/search primitives, guarded by authorization and canonical project-root resolution.
+P4-T01 structured task-profile discovery and safe command execution for registered local projects.
 
 ## Next task
-P3-T02 atomic safe write/append restrictions after P3-T01 passes.
+Apply+Verify orchestration and project/tool/skill bootstrap discovery. Git MCP features are deferred.
 
 ## Run/test/build
 `npm install`; `npm run dev:stdio`; `npm run dev:http`; `npm run check`.

@@ -16,4 +16,8 @@ Verified: `control-center.test.ts` exercises the real dashboard route and Overvi
 
 Verified: `authorization.test.ts` covers granted/missing capability, wrong-project, expired, revoked and inactive-project sessions plus global/project deny overrides. `control-center.test.ts` covers human-facing session issuance/revoke and policy create/update/delete APIs.
 
-Next: secure filesystem authorization + traversal/symlink/content-limit tests, then command runner policy/timeout/output-limit tests.
+Verified: `secure-filesystem.test.ts` covers read/stat/list/search, sensitive and binary blocking, traversal/junction isolation, atomic SHA-guarded writes, diff, exact/batch patch, copy/move/delete and backup behavior. `mcp-filesystem-contract.test.ts` proves a Control Center grant enables real MCP read/write and a subsequent deny policy blocks write immediately.
+
+Current full gate: 9 test files / 37 tests PASS plus lint, strict typecheck and production build.
+
+Next: command runner task-profile, injection, timeout/process-tree, output-limit/environment-redaction tests; then apply+verify orchestration tests.

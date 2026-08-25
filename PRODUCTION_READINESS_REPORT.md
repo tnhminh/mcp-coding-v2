@@ -10,7 +10,8 @@ Status: **FAIL — INCOMPLETE** (2026-08-25)
 | schema/invalid-request contract suite | PASS | unknown tool => ProtocolError -32602; strict tool input => isError validation result over stdio + HTTP |
 | authentication/RBAC | FAIL | local project-bound temporary permission sessions + deny policies PASS; production identity/authentication and multi-user RBAC remain incomplete |
 | project/path isolation | PASS | registry-aware canonical resolver; traversal, symlink/junction, nested-project and Windows unsafe-path adversarial tests PASS |
-| command policies | FAIL | not implemented |
+| secure filesystem coding surface | PASS | permission/policy-gated MCP read/write/search/diff/patch/copy/move/delete; SHA guards, limits, sensitive/binary blocking and E2E policy enforcement PASS |
+| command policies | FAIL | P4 command runner not yet implemented |
 | secret redaction | FAIL | JSON logger redacts sensitive field keys, but full secret-reference/scanning coverage is not implemented |
 | workflow recovery | FAIL | not implemented |
 | full unit/integration/e2e/browser/deploy/rollback suites | FAIL | incomplete |

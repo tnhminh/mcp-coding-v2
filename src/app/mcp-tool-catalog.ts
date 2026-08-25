@@ -1,0 +1,15 @@
+export const mcpToolCatalog = [
+  { name: 'system_health', mode: 'read-only', description: 'Minimal non-sensitive MCP control-plane health snapshot.' },
+  { name: 'read_file', mode: 'read-only', description: 'Read one authorized project text file with SHA-256 concurrency metadata.' },
+  { name: 'stat_path', mode: 'read-only', description: 'Stat one authorized path inside the registered project boundary.' },
+  { name: 'list_files', mode: 'read-only', description: 'List bounded project files/directories without following symlinks.' },
+  { name: 'search_text', mode: 'read-only', description: 'Literal case-insensitive bounded text search inside a project.' },
+  { name: 'write_file', mode: 'write', description: 'Atomically create/replace a text file; existing files require current SHA-256.' },
+  { name: 'append_file', mode: 'write', description: 'Atomically append text; existing files require current SHA-256.' },
+  { name: 'diff_file', mode: 'read-only', description: 'Preview a bounded unified-style diff against proposed text content.' },
+  { name: 'apply_patch', mode: 'write', description: 'Apply an exact text replacement guarded by SHA-256 and expected match count.' },
+  { name: 'batch_patch', mode: 'write', description: 'Apply 1–20 prevalidated exact patches with best-effort rollback on failure.' },
+  { name: 'copy_file', mode: 'write', description: 'Copy a bounded regular text file to a new in-project path.' },
+  { name: 'move_file', mode: 'write', description: 'Move a regular text file to a new in-project path with SHA-256 guard.' },
+  { name: 'delete_file', mode: 'destructive', description: 'Delete a text file with SHA-256 guard and runtime backup.' },
+] as const;

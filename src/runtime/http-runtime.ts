@@ -7,13 +7,12 @@ import type { AppConfig } from '../app/config.js';
 import { ControlCenterService } from '../app/control-center-service.js';
 import { AppError, toPublicError } from '../app/errors.js';
 import { createMcpServer } from '../app/create-mcp-server.js';
+import { createRuntimeServices } from '../app/runtime-services.js';
 import { HealthService } from '../app/health-service.js';
 import { controlCenterCss, controlCenterHtml, controlCenterJs } from '../control-center/ui.js';
 import { JsonLogger } from '../infra/json-logger.js';
 import { openSqliteDatabase } from '../infra/sqlite/database.js';
-import { SqliteProjectRepository } from '../infra/sqlite/sqlite-project-repository.js';
-import { SqlitePermissionSessionRepository } from '../infra/sqlite/sqlite-permission-session-repository.js';
-import { SqlitePolicyRepository } from '../infra/sqlite/sqlite-policy-repository.js';
+
 
 export interface HttpRuntime {
   server: Server;
@@ -51,11 +50,9 @@ export async function startHttpRuntime(config: AppConfig, logger: JsonLogger): P
   const databaseFilename = config.databasePath === ':memory:' ? ':memory:' : path.resolve(config.databasePath);
   if (databaseFilename !== ':memory:') await mkdir(path.dirname(databaseFilename), { recursive: true });
   const database = openSqliteDatabase(databaseFilename);
-  const projects = new SqliteProjectRepository(database.database);
-  const permissionSessions = new SqlitePermissionSessionRepository(database.database);
-  const policies = new SqlitePolicyRepository(database.database);
-  const controlCenter = new ControlCenterService(projects, permissionSessions, policies, { ...config, databasePath: databaseFilename });
-  const mcpHandler = createMcpHandler(() => createMcpServer(), {
+  const services = createRuntimeServices(database.database, databaseFilename);
+  const controlCenter = new ControlCenterService(services.projects, services.permissionSessions, services.policies, { ...config, databasePath: databaseFilename });
+  const mcpHandler = createMcpHandler(() => createMcpServer({ filesystem: services.filesystem }), {
     legacy: 'reject',
     onerror: (error) => logger.error('mcp_request_failed', error),
   });

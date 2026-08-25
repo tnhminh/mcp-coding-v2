@@ -14,7 +14,12 @@ export type ErrorCode =
   | 'AUTHORIZATION_DENIED'
   | 'POLICY_DENIED'
   | 'COMMAND_FAILED'
-  | 'OUTPUT_LIMIT_EXCEEDED';
+  | 'OUTPUT_LIMIT_EXCEEDED'
+  | 'SENSITIVE_PATH'
+  | 'FILE_TOO_LARGE'
+  | 'BINARY_FILE'
+  | 'SHA_MISMATCH'
+  | 'PATCH_FAILED';
 
 export interface AppErrorOptions {
   code: ErrorCode;

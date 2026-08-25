@@ -26,3 +26,6 @@ Path authorization uses canonical `realpath` roots and a resolver factory built 
 
 ## ADR-009 — Human-issued temporary capability sessions with deny override
 Privileged local coding operations require a project-bound permission session issued through the localhost Control Center. Sessions carry an explicit fixed capability set, expire after at most 24 hours and can be revoked immediately. Policies do not grant capability: a valid session grant is always required. Enabled global or project-scoped `deny` policies override matching session grants. This prevents repository prompts or MCP callers from self-elevating by supplying a policy-like request.
+
+## ADR-010 — Text-first secure filesystem with optimistic concurrency
+Coding filesystem tools operate on bounded UTF-8 text inside registered canonical project roots. Credential-oriented paths, private-key material, binary/NUL content and files above 1 MiB are excluded. Existing-file mutations require the SHA-256 observed by the caller; writes commit through an in-directory temporary file plus rename and re-resolve the target before commit. Multi-file patch prevalidates all changes and attempts rollback on failure; destructive delete requires persistent backup storage. This is a local coding safety boundary, not a claim of race-free filesystem semantics.

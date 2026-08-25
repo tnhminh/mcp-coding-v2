@@ -26,3 +26,6 @@
 - Added P2 authorization capability catalog and temporary project-bound permission sessions with TTL/revoke semantics.
 - Added SQLite-backed global/project authorization policies with deterministic deny override enforcement.
 - Activated real Permissions and Policies Control Center controls and HTTP APIs.
+- Added permission/policy-gated Secure Filesystem services and MCP tools for read/stat/list/search/write/append/diff/exact patch/batch patch/copy/move/delete.
+- Added sensitive-path/private-key/binary/size restrictions, canonical re-resolution, SHA-256 optimistic concurrency and persisted delete backups.
+- Added adversarial filesystem tests plus an end-to-end CMS grant/policy → MCP read/write enforcement contract; full gate reached 37 tests PASS.
