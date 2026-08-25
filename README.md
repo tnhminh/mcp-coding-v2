@@ -1,6 +1,6 @@
 ﻿# MCP Coding v2
 
-Production-oriented MCP software-engineering control plane. Verified scope now includes MCP 2026-07-28 runtime, SQLite Project Registry, temporary permissions/policies, canonical cross-project isolation, a real Control Center and the secure local-project filesystem coding tool surface.
+Production-oriented MCP software-engineering control plane. Verified scope now includes MCP 2026-07-28 runtime, SQLite Project Registry, temporary permissions/policies, canonical cross-project isolation, a real Control Center, secure local-project filesystem tools, workspace/skill discovery, structured project tasks and apply-and-verify rollback orchestration.
 
 ## Run
 - `npm install`

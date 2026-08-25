@@ -31,12 +31,16 @@ Strict TypeScript / Node ESM. MCP composition lives in `src/app/create-mcp-serve
 - SHA-256 optimistic concurrency for destructive overwrites and exact patches
 - sensitive-path/private-key/binary/oversize blocking plus delete backups
 - end-to-end CMS permission/policy → MCP filesystem enforcement contract
+- local project/workspace discovery: list_projects, project_info and workspace_bootstrap
+- project skill/instruction discovery: list_skills and read_skill
+- structured test/lint/typecheck/check/build/bench runner with command.run authorization, environment/output/time bounds, redaction and process-tree cleanup
+- apply_and_verify orchestration with default rollback on failed verification; real HTTP MCP E2E PASS
 
 ## Current task
-P4-T01 structured task-profile discovery and safe command execution for registered local projects.
+P5-T01 Project Brain file/language/symbol/import/reference/test/config indexing.
 
 ## Next task
-Apply+Verify orchestration and project/tool/skill bootstrap discovery. Git MCP features are deferred.
+P5-T02 TS/JS AST graph edges, then P6 bounded context retrieval + impact analysis. Git MCP features remain deferred.
 
 ## Run/test/build
 `npm install`; `npm run dev:stdio`; `npm run dev:http`; `npm run check`.

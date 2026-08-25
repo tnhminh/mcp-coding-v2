@@ -1,11 +1,21 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
+import type { ApplyVerifyService } from './apply-verify-service.js';
 import { HealthService } from './health-service.js';
 import { toPublicError } from './errors.js';
+import type { ProjectDiscoveryService } from './project-discovery-service.js';
 import type { SecureFilesystemService } from './secure-filesystem-service.js';
+import type { SkillDiscoveryService } from './skill-discovery-service.js';
+import { taskKindSchema, type TaskRunnerService } from './task-runner-service.js';
+import type { WorkspaceBootstrapService } from './workspace-bootstrap-service.js';
 
 export interface McpToolServices {
   filesystem: SecureFilesystemService;
+  projectDiscovery: ProjectDiscoveryService;
+  tasks: TaskRunnerService;
+  skills: SkillDiscoveryService;
+  workspace: WorkspaceBootstrapService;
+  applyVerify: ApplyVerifyService;
 }
 
 const authShape = {
@@ -50,6 +60,71 @@ export function createMcpServer(services?: McpToolServices): McpServer {
 
   if (!services) return server;
   const fs = services.filesystem;
+
+  server.registerTool('list_projects', {
+    title: 'List local projects', description: 'List registered local project workspaces so the client can select a project ID.',
+    inputSchema: z.object({}).strict(), annotations: { readOnlyHint: true },
+  }, async () => { try { return ok({ projects: await services.projectDiscovery.listProjects() }); } catch (error) { return failed(error); } });
+
+  server.registerTool('project_info', {
+    title: 'Project information', description: 'Return one registered local project workspace by ID.',
+    inputSchema: z.object({ project_id: z.string().uuid() }).strict(), annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok(await services.projectDiscovery.projectInfo(input.project_id)); } catch (error) { return failed(error); } });
+
+  server.registerTool('workspace_bootstrap', {
+    title: 'Bootstrap local workspace', description: 'Return project metadata, tool catalog, task profiles and discovered skills/instructions for an authorized local project.',
+    inputSchema: z.object(authShape).strict(), annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok(await services.workspace.bootstrap(authorized(input))); } catch (error) { return failed(error); } });
+
+  server.registerTool('list_task_profiles', {
+    title: 'List project task profiles', description: 'Discover structured test/lint/typecheck/check/build/bench profiles without executing them.',
+    inputSchema: z.object(authShape).strict(), annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok({ taskProfiles: await services.tasks.listTaskProfiles(authorized(input)) }); } catch (error) { return failed(error); } });
+
+  server.registerTool('run_task', {
+    title: 'Run project task', description: 'Run one structured project task with shell disabled, sanitized environment, timeout, output cap and process-tree cleanup.',
+    inputSchema: z.object({ ...authShape, task: taskKindSchema, timeout_seconds: z.number().int().min(1).max(600).optional() }).strict(),
+    annotations: { readOnlyHint: false },
+  }, async (input) => { try { return ok(await services.tasks.runTask({ ...authorized(input), task: input.task, ...(input.timeout_seconds === undefined ? {} : { timeoutSeconds: input.timeout_seconds }) })); } catch (error) { return failed(error); } });
+
+  server.registerTool('list_skills', {
+    title: 'List project skills', description: 'Discover AGENTS, SKILL, prompt and editor-rule files inside an authorized local project.',
+    inputSchema: z.object(authShape).strict(), annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok({ skills: await services.skills.listSkills(authorized(input)) }); } catch (error) { return failed(error); } });
+
+  server.registerTool('read_skill', {
+    title: 'Read project skill', description: 'Read one recognized project skill/instruction file.',
+    inputSchema: z.object({ ...authShape, path: pathSchema }).strict(), annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok(await services.skills.readSkill({ ...authorized(input), path: input.path })); } catch (error) { return failed(error); } });
+
+  const replaceChangeSchema = z.object({
+    op: z.literal('replace'), path: pathSchema, search: z.string().min(1).max(1024 * 1024), replacement: z.string().max(1024 * 1024),
+    expected_sha256: shaSchema, expected_count: z.number().int().min(1).max(100).default(1),
+  }).strict();
+  const writeChangeSchema = z.object({
+    op: z.literal('write'), path: pathSchema, content: z.string().max(1024 * 1024 + 1), expected_sha256: shaSchema.nullable().optional(),
+  }).strict();
+  server.registerTool('apply_and_verify', {
+    title: 'Apply and verify', description: 'Apply bounded code changes, run structured verification tasks, and roll back automatically when verification fails.',
+    inputSchema: z.object({
+      ...authShape,
+      changes: z.array(z.discriminatedUnion('op', [replaceChangeSchema, writeChangeSchema])).min(1).max(20),
+      tasks: z.array(taskKindSchema).min(1).max(6),
+      rollback_on_failure: z.boolean().default(true),
+    }).strict(),
+    annotations: { readOnlyHint: false, destructiveHint: true },
+  }, async (input) => {
+    try {
+      return ok(await services.applyVerify.applyAndVerify({
+        ...authorized(input),
+        changes: input.changes.map((change) => change.op === 'replace'
+          ? { op: 'replace' as const, path: change.path, search: change.search, replacement: change.replacement, expectedSha256: change.expected_sha256, expectedCount: change.expected_count }
+          : { op: 'write' as const, path: change.path, content: change.content, ...(change.expected_sha256 === undefined ? {} : { expectedSha256: change.expected_sha256 }) }),
+        tasks: input.tasks,
+        rollbackOnFailure: input.rollback_on_failure,
+      }));
+    } catch (error) { return failed(error); }
+  });
 
   server.registerTool('read_file', {
     title: 'Read project file', description: 'Read one authorized project text file with SHA-256 metadata.',

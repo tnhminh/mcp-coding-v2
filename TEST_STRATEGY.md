@@ -18,6 +18,8 @@ Verified: `authorization.test.ts` covers granted/missing capability, wrong-proje
 
 Verified: `secure-filesystem.test.ts` covers read/stat/list/search, sensitive and binary blocking, traversal/junction isolation, atomic SHA-guarded writes, diff, exact/batch patch, copy/move/delete and backup behavior. `mcp-filesystem-contract.test.ts` proves a Control Center grant enables real MCP read/write and a subsequent deny policy blocks write immediately.
 
-Current full gate: 9 test files / 37 tests PASS plus lint, strict typecheck and production build.
+Verified: `task-runner.test.ts` covers structured profile discovery, no caller-controlled shell interpolation, environment isolation, output redaction/capping, timeout and Windows process-tree cleanup. `workspace-bootstrap.test.ts` covers project metadata, task and AGENTS/SKILL discovery. `apply-verify.test.ts` covers successful verification, rollback of existing/new files on failure and explicit no-rollback mode. The HTTP MCP E2E contract exercises list_projects → workspace_bootstrap → run_task → apply_and_verify → policy denial.
 
-Next: command runner task-profile, injection, timeout/process-tree, output-limit/environment-redaction tests; then apply+verify orchestration tests.
+Current full gate: 12 test files / 48 tests PASS plus lint, strict typecheck and production build.
+
+Next: Project Brain index/AST graph tests, then bounded context-ranking and impact-analysis tests.

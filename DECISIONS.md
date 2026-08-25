@@ -29,3 +29,6 @@ Privileged local coding operations require a project-bound permission session is
 
 ## ADR-010 — Text-first secure filesystem with optimistic concurrency
 Coding filesystem tools operate on bounded UTF-8 text inside registered canonical project roots. Credential-oriented paths, private-key material, binary/NUL content and files above 1 MiB are excluded. Existing-file mutations require the SHA-256 observed by the caller; writes commit through an in-directory temporary file plus rename and re-resolve the target before commit. Multi-file patch prevalidates all changes and attempts rollback on failure; destructive delete requires persistent backup storage. This is a local coding safety boundary, not a claim of race-free filesystem semantics.
+
+## ADR-011 — Structured project tasks instead of a raw shell
+The MCP coding surface does not expose arbitrary shell command strings. A permission-gated `run_task` chooses one of six fixed task kinds discovered from package.json, Cargo, Go or a bounded `.mcp/tasks.json` executable/argv profile. Runtime execution uses a sanitized environment, output/time bounds, redaction and process-tree cleanup. Windows package-manager shims are invoked only through a fixed manager + fixed task command. `apply_and_verify` composes SHA-guarded file changes with these verification tasks and rolls back by default on failure.

@@ -53,14 +53,19 @@ Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
   - Evidence: copy/move destination guards, SHA-256 protected move/delete, persistent delete backup and junction/symlink escape rejection PASS.
 
 ## EPIC P4 — Command/Test Runner
-- [~] P4-T01 Structured task profiles.
-- [ ] P4-T02 Process timeout/cancel/tree cleanup/output limits.
-- [ ] P4-T03 command policy + env allowlist + redaction + dangerous-command tests.
+- [x] P4-T01 Structured task profiles.
+  - Evidence: package.json/Cargo/go/custom `.mcp/tasks.json` discovery; task kinds are limited to test/lint/typecheck/check/build/bench.
+- [x] P4-T02 Process timeout/cancel/tree cleanup/output limits.
+  - Evidence: bounded timeout/output, Windows process-tree cleanup and orphan-prevention tests PASS.
+- [x] P4-T03 command policy + env allowlist + redaction + dangerous-command tests.
+  - Evidence: command.run permission required; no caller-provided raw shell; custom executable allowlist, sanitized environment and output redaction tests PASS.
+- [x] P4-T04 workspace/skill bootstrap + apply-and-verify orchestration.
+  - Evidence: list_projects/project_info/workspace_bootstrap/list_skills/read_skill/run_task/apply_and_verify are live over MCP; failed verification rolls changes back by default; HTTP E2E PASS.
 
 ## EPIC P5 — Project Brain
-- [ ] Incremental file/language/symbol/import/reference/test/config/Git index.
-- [ ] TS/JS AST parser and graph edges.
-- [ ] brain status/build/refresh/summary and graph query tools.
+- [~] P5-T01 Incremental file/language/symbol/import/reference/test/config index.
+- [ ] P5-T02 TS/JS AST parser and graph edges.
+- [ ] P5-T03 brain status/build/refresh/summary and graph query tools.
 
 ## EPIC P6 — Context + Impact
 - [ ] lexical/BM25 + graph + Git/task-aware ranking.

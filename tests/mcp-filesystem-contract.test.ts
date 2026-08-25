@@ -63,7 +63,11 @@ describe('MCP filesystem vibecode contract', () => {
     const projectRoot = path.join(workspace, 'project');
     const databasePath = path.join(workspace, 'runtime.sqlite');
     await mkdir(path.join(projectRoot, 'src'), { recursive: true });
+    await mkdir(path.join(projectRoot, '.agents', 'skills', 'verify'), { recursive: true });
     await writeFile(path.join(projectRoot, 'src', 'main.ts'), 'export const answer = 42;\n', 'utf8');
+    await writeFile(path.join(projectRoot, 'AGENTS.md'), '# Local agent instructions\nRun verification after edits.\n', 'utf8');
+    await writeFile(path.join(projectRoot, '.agents', 'skills', 'verify', 'SKILL.md'), '# Verify skill\nUse the project test task.\n', 'utf8');
+    await writeFile(path.join(projectRoot, 'package.json'), JSON.stringify({ scripts: { test: "node -e \"console.log('fixture-pass')\"" } }), 'utf8');
 
     const port = await reservePort();
     const child = spawn(process.execPath, [tsxCli, 'src/entrypoints/http.ts'], {
@@ -79,7 +83,7 @@ describe('MCP filesystem vibecode contract', () => {
     });
     const projectId = projectBody.project.id;
     const sessionBody = await jsonApi<{ permissionSession: { id: string } }>(port, `/api/projects/${projectId}/permission-sessions`, {
-      method: 'POST', body: JSON.stringify({ principalId: 'contract-agent', capabilities: ['filesystem.read', 'filesystem.write'], ttlSeconds: 3600 }),
+      method: 'POST', body: JSON.stringify({ principalId: 'contract-agent', capabilities: ['filesystem.read', 'filesystem.write', 'command.run'], ttlSeconds: 3600 }),
     });
     const permissionSessionId = sessionBody.permissionSession.id;
 
@@ -89,13 +93,49 @@ describe('MCP filesystem vibecode contract', () => {
     );
     try {
       await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`)), { timeout: 8_000 });
+
+      const projectList = await client.callTool({ name: 'list_projects', arguments: {} });
+      expect(projectList.isError).not.toBe(true);
+      const projects = (projectList.structuredContent as { projects?: Array<{ id: string }> } | undefined)?.projects ?? [];
+      expect(projects.some((project) => project.id === projectId)).toBe(true);
+
+      const bootstrap = await client.callTool({ name: 'workspace_bootstrap', arguments: { project_id: projectId, permission_session_id: permissionSessionId } });
+      expect(bootstrap.isError).not.toBe(true);
+      const boot = bootstrap.structuredContent as { taskProfiles?: Array<{ id: string }>; skills?: Array<{ kind: string }> } | undefined;
+      expect(boot?.taskProfiles?.map((profile) => profile.id)).toContain('test');
+      expect(boot?.skills?.map((skill) => skill.kind)).toEqual(expect.arrayContaining(['agents', 'skill']));
+
+      const task = await client.callTool({ name: 'run_task', arguments: { project_id: projectId, permission_session_id: permissionSessionId, task: 'test' } });
+      expect(task.isError, JSON.stringify(task.content)).not.toBe(true);
+      expect(task.structuredContent).toMatchObject({ task: 'test', success: true });
+      const taskOutput = (task.structuredContent as { stdout?: string } | undefined)?.stdout;
+      expect(taskOutput).toContain('fixture-pass');
+
       const read = await client.callTool({ name: 'read_file', arguments: { project_id: projectId, permission_session_id: permissionSessionId, path: 'src/main.ts' } });
       expect(read.isError).not.toBe(true);
       expect(read.structuredContent).toMatchObject({ path: path.join('src', 'main.ts') });
       const structured = read.structuredContent as Record<string, unknown> | undefined;
       const readContent: unknown = structured?.content;
+      const readSha: unknown = structured?.sha256;
       expect(typeof readContent).toBe('string');
+      expect(typeof readSha).toBe('string');
       if (typeof readContent === 'string') expect(readContent).toContain('answer = 42');
+
+      if (typeof readSha !== 'string') throw new Error('read_file did not return SHA-256');
+      const applyVerify = await client.callTool({
+        name: 'apply_and_verify',
+        arguments: {
+          project_id: projectId,
+          permission_session_id: permissionSessionId,
+          changes: [{ op: 'replace', path: 'src/main.ts', search: 'answer = 42', replacement: 'answer = 43', expected_sha256: readSha }],
+          tasks: ['test'],
+        },
+      });
+      expect(applyVerify.isError, JSON.stringify(applyVerify.content)).not.toBe(true);
+      expect(applyVerify.structuredContent).toMatchObject({ verified: true, rolledBack: false });
+      const reread = await client.callTool({ name: 'read_file', arguments: { project_id: projectId, permission_session_id: permissionSessionId, path: 'src/main.ts' } });
+      const rereadContent = (reread.structuredContent as { content?: string } | undefined)?.content;
+      expect(rereadContent).toContain('answer = 43');
 
       const write = await client.callTool({ name: 'write_file', arguments: { project_id: projectId, permission_session_id: permissionSessionId, path: 'src/generated.ts', content: 'export const generated = true;\n' } });
       expect(write.isError).not.toBe(true);

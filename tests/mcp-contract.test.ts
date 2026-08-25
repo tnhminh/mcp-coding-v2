@@ -19,8 +19,8 @@ function createModernClient(): Client {
 async function assertToolContract(client: Client): Promise<void> {
   const { tools } = await client.listTools();
   expect(tools.map((tool) => tool.name)).toEqual(expect.arrayContaining([
-    'system_health', 'read_file', 'stat_path', 'list_files', 'search_text',
-    'write_file', 'append_file', 'diff_file', 'apply_patch', 'batch_patch', 'copy_file', 'move_file', 'delete_file',
+    'system_health', 'list_projects', 'project_info', 'workspace_bootstrap', 'list_task_profiles', 'run_task', 'list_skills', 'read_skill', 'apply_and_verify',
+    'read_file', 'stat_path', 'list_files', 'search_text', 'write_file', 'append_file', 'diff_file', 'apply_patch', 'batch_patch', 'copy_file', 'move_file', 'delete_file',
   ]));
 
   const result = await client.callTool({ name: 'system_health', arguments: {} });

@@ -1,5 +1,13 @@
 export const mcpToolCatalog = [
   { name: 'system_health', mode: 'read-only', description: 'Minimal non-sensitive MCP control-plane health snapshot.' },
+  { name: 'list_projects', mode: 'read-only', description: 'List registered local project workspaces and IDs.' },
+  { name: 'project_info', mode: 'read-only', description: 'Return metadata for one registered local project.' },
+  { name: 'workspace_bootstrap', mode: 'read-only', description: 'Bootstrap project metadata, tools, task profiles and project skills/instructions.' },
+  { name: 'list_task_profiles', mode: 'read-only', description: 'Discover structured project test/lint/typecheck/check/build/bench profiles.' },
+  { name: 'run_task', mode: 'execute', description: 'Execute one structured task with no shell interpolation, sanitized env, timeout/output caps and tree cleanup.' },
+  { name: 'list_skills', mode: 'read-only', description: 'Discover project AGENTS/SKILL/prompt/rule files.' },
+  { name: 'read_skill', mode: 'read-only', description: 'Read one recognized project skill/instruction file.' },
+  { name: 'apply_and_verify', mode: 'write+execute', description: 'Apply bounded changes, run structured verification tasks and roll back on failure.' },
   { name: 'read_file', mode: 'read-only', description: 'Read one authorized project text file with SHA-256 concurrency metadata.' },
   { name: 'stat_path', mode: 'read-only', description: 'Stat one authorized path inside the registered project boundary.' },
   { name: 'list_files', mode: 'read-only', description: 'List bounded project files/directories without following symlinks.' },

@@ -29,3 +29,11 @@
 - Added permission/policy-gated Secure Filesystem services and MCP tools for read/stat/list/search/write/append/diff/exact patch/batch patch/copy/move/delete.
 - Added sensitive-path/private-key/binary/size restrictions, canonical re-resolution, SHA-256 optimistic concurrency and persisted delete backups.
 - Added adversarial filesystem tests plus an end-to-end CMS grant/policy → MCP read/write enforcement contract; full gate reached 37 tests PASS.
+
+## 2026-08-26
+- Added local project/workspace discovery tools: list_projects, project_info and workspace_bootstrap.
+- Added project skill/instruction discovery for AGENTS/SKILL/prompt/rule files.
+- Added structured test/lint/typecheck/check/build/bench task profiles with command.run authorization, sanitized environment, output redaction/capping, timeout and process-tree cleanup.
+- Added Windows-safe package task execution without exposing caller-controlled raw shell input.
+- Added apply_and_verify orchestration with SHA-guarded changes, structured verification and default rollback on failure.
+- Expanded MCP HTTP E2E to cover project discovery → workspace bootstrap → task execution → apply_and_verify → policy denial; full gate reached 48 tests PASS.

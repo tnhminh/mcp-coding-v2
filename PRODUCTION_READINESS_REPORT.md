@@ -1,6 +1,6 @@
 ﻿# PRODUCTION_READINESS_REPORT
 
-Status: **FAIL — INCOMPLETE** (2026-08-25)
+Status: **FAIL — INCOMPLETE** (2026-08-26)
 
 | Gate | State | Evidence / gap |
 |---|---|---|
@@ -11,8 +11,8 @@ Status: **FAIL — INCOMPLETE** (2026-08-25)
 | authentication/RBAC | FAIL | local project-bound temporary permission sessions + deny policies PASS; production identity/authentication and multi-user RBAC remain incomplete |
 | project/path isolation | PASS | registry-aware canonical resolver; traversal, symlink/junction, nested-project and Windows unsafe-path adversarial tests PASS |
 | secure filesystem coding surface | PASS | permission/policy-gated MCP read/write/search/diff/patch/copy/move/delete; SHA guards, limits, sensitive/binary blocking and E2E policy enforcement PASS |
-| command policies | FAIL | P4 command runner not yet implemented |
-| secret redaction | FAIL | JSON logger redacts sensitive field keys, but full secret-reference/scanning coverage is not implemented |
+| command policies | PASS | structured task profiles only; command.run grant required; no caller raw shell; env/output/time bounds, redaction and process-tree cleanup tests PASS |
+| secret redaction | FAIL | JSON logger + task output redaction PASS, but full secret-reference/scanning coverage is not implemented |
 | workflow recovery | FAIL | not implemented |
 | full unit/integration/e2e/browser/deploy/rollback suites | FAIL | incomplete |
 | logs/metrics/traces/alerts | FAIL | structured JSON logs PASS; metrics/traces/alerts pending |

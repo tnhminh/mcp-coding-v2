@@ -16,7 +16,14 @@ function main(): void {
   if (databaseFilename !== ':memory:') mkdirSync(path.dirname(databaseFilename), { recursive: true });
   const database = openSqliteDatabase(databaseFilename);
   const services = createRuntimeServices(database.database, databaseFilename);
-  const handle = serveStdio(() => createMcpServer({ filesystem: services.filesystem }), {
+  const handle = serveStdio(() => createMcpServer({
+    filesystem: services.filesystem,
+    projectDiscovery: services.projectDiscovery,
+    tasks: services.tasks,
+    skills: services.skills,
+    workspace: services.workspace,
+    applyVerify: services.applyVerify,
+  }), {
     legacy: 'reject',
     onerror: (error) => logger.error('stdio_transport_failed', error),
   });
