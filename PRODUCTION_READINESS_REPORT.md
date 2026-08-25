@@ -11,10 +11,10 @@ Status: **FAIL — INCOMPLETE** (2026-08-25)
 | authentication/RBAC | FAIL | not implemented |
 | project/path isolation | FAIL | not implemented |
 | command policies | FAIL | not implemented |
-| secret redaction | FAIL | not implemented |
+| secret redaction | FAIL | JSON logger redacts sensitive field keys, but full secret-reference/scanning coverage is not implemented |
 | workflow recovery | FAIL | not implemented |
 | full unit/integration/e2e/browser/deploy/rollback suites | FAIL | incomplete |
-| logs/metrics/traces/alerts | FAIL | incomplete |
+| logs/metrics/traces/alerts | FAIL | structured JSON logs PASS; metrics/traces/alerts pending |
 | backup/restore/runbook qualification | FAIL | incomplete |
 | Control Center | FAIL | not implemented |
 | docs/handoff baseline | PASS | current files present, explicitly mark gaps |

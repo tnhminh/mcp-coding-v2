@@ -11,3 +11,7 @@
 - Added official MCP v2 client contract dependency and real stdio/HTTP protocol tests.
 - Fixed HTTP modern-era negotiation by replacing direct transport wiring with SDK v2 createMcpHandler + Node adapter.
 - Enforced strict empty input schema for system_health and verified invalid-argument behavior.
+- Added typed runtime configuration with loopback-only HTTP exposure and bounded port/log-level validation.
+- Added structured application errors and safe public HTTP error projection.
+- Added JSON logger with reserved-field isolation and sensitive-key redaction.
+- Extracted a testable HTTP runtime and verified idempotent graceful shutdown.

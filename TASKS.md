@@ -22,10 +22,11 @@ Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
   - Security: loopback bind + Host/Origin validation.
 - [x] P1-T05 Add MCP protocol contract tests for initialize/tools/list/tools/call over stdio and HTTP.
   - Evidence: official v2 client pinned to 2026-07-28 passes stdio + HTTP negotiation, tools/list, tools/call, unknown-tool and strict-input validation contracts.
-- [~] P1-T06 Structured error model, configuration schema, JSON logger, graceful lifecycle tests.
+- [x] P1-T06 Structured error model, configuration schema, JSON logger, graceful lifecycle tests.
+  - Evidence: secure loopback-only config validation, typed public error projection, structured/redacted JSON logs and idempotent HTTP shutdown tests; full `npm run check` PASS.
 
 ## EPIC P2 — Project Registry / Permissions / Rules
-- [ ] P2-T01 Project aggregate + repository interface + SQLite migration.
+- [~] P2-T01 Project aggregate + repository interface + SQLite migration.
 - [ ] P2-T02 Canonical root/path resolver and cross-project isolation tests.
 - [ ] P2-T03 Capability model and temporary permission sessions.
 - [ ] P2-T04 Global/project policy persistence and deterministic enforcement hooks.

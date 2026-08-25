@@ -1,6 +1,6 @@
 ﻿# MCP Coding v2
 
-Production-oriented MCP software-engineering control plane. Current verified scope: Phase 0 baseline plus the first Phase 1 foundation slice (TypeScript project, MCP SDK v2, stdio/Streamable HTTP entrypoints, system_health tool, health endpoints, lint/typecheck/test/build pipeline).
+Production-oriented MCP software-engineering control plane. Current verified scope: Phase 0 plus Phase 1 foundation (official MCP SDK v2, modern 2026-07-28 stdio/Streamable HTTP contracts, strict configuration, typed errors, structured JSON logging, health endpoints and graceful runtime lifecycle). Phase 2 project isolation/persistence is now active.
 
 ## Run
 - `npm install`

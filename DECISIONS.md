@@ -14,3 +14,6 @@ Initial HTTP server binds `127.0.0.1` and uses SDK-provided localhost Host/Origi
 
 ## ADR-005 — Use createMcpHandler for modern HTTP
 Direct NodeStreamableHTTPServerTransport wiring is a legacy/stateless transport primitive and did not satisfy the 2026-07-28 server/discover negotiation contract. HTTP now mounts SDK v2 createMcpHandler through toNodeHandler, with localhost Host/Origin guards in front.
+
+## ADR-006 — No unauthenticated non-loopback HTTP
+Until remote authentication/authorization is implemented, configuration accepts only loopback hosts. Runtime failures use typed errors and structured JSON logs; arbitrary caller fields cannot overwrite reserved log keys.
