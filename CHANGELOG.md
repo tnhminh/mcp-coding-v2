@@ -37,3 +37,7 @@
 - Added Windows-safe package task execution without exposing caller-controlled raw shell input.
 - Added apply_and_verify orchestration with SHA-guarded changes, structured verification and default rollback on failure.
 - Expanded MCP HTTP E2E to cover project discovery → workspace bootstrap → task execution → apply_and_verify → policy denial; full gate reached 48 tests PASS.
+- Added bounded Project Brain indexing for file/language/test/config metadata and TypeScript/JavaScript AST declarations, imports and identifier references.
+- Added SHA-based incremental Brain refresh plus SQLite snapshot persistence across runtime recreation; corrupted snapshots fail closed and are removed.
+- Added MCP tools brain_build, brain_status, find_symbol, symbol_references, context_bundle and impact_analysis.
+- Added bounded weighted lexical+graph context retrieval and declaration/reference/importer/related-test impact analysis; full gate reached 54 tests PASS.

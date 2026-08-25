@@ -63,16 +63,23 @@ Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
   - Evidence: list_projects/project_info/workspace_bootstrap/list_skills/read_skill/run_task/apply_and_verify are live over MCP; failed verification rolls changes back by default; HTTP E2E PASS.
 
 ## EPIC P5 — Project Brain
-- [~] P5-T01 Incremental file/language/symbol/import/reference/test/config index.
-- [ ] P5-T02 TS/JS AST parser and graph edges.
-- [ ] P5-T03 brain status/build/refresh/summary and graph query tools.
+- [x] P5-T01 Incremental file/language/symbol/import/reference/test/config index.
+  - Evidence: bounded Secure Filesystem scan, language/category metadata, SHA-based incremental TS/JS reuse and SQLite snapshot persistence across runtime recreation.
+- [x] P5-T02 TS/JS AST parser and graph edges.
+  - Evidence: TypeScript compiler API extracts declarations, identifier references and import/export/require edges with relative module resolution.
+- [x] P5-T03 brain status/build/refresh/summary and graph query tools.
+  - Evidence: brain_build, brain_status, find_symbol and symbol_references MCP tools; corrupted persisted snapshots fail closed to not_indexed.
 
 ## EPIC P6 — Context + Impact
-- [ ] lexical/BM25 + graph + Git/task-aware ranking.
-- [ ] bounded token-budget context bundle.
-- [ ] blast-radius/related-test analysis.
+- [x] P6-T01 bounded weighted lexical + graph context ranking.
+  - Evidence: context_bundle combines exact/partial symbol, identifier reference, import/path and Secure Filesystem literal-text evidence.
+- [ ] P6-T02 richer BM25 + Git/task-aware ranking.
+  - Note: Git-aware ranking remains deferred with Git feature work; current weighted lexical+graph retrieval is production-bounded but is not claimed as BM25.
+- [x] P6-T03 bounded context bundle + blast-radius/related-test analysis.
+  - Evidence: context_bundle enforces file/character budgets; impact_analysis traces file/symbol declarations, references, importers, second-wave importers, related tests and nearby configs.
 
 ## EPIC P7 — Workflow + Tasks + AI Jobs
+- [~] P7-T00 autonomous IMPLEMENT/TEST/REVIEW/FIX coding-cycle orchestration over Brain/Context/Impact + ApplyVerify.
 - [ ] persistent state machine with invalid-transition rejection.
 - [ ] completion evidence gates and retry/fix loop.
 - [ ] task dependency graph and stable job identity/accounting.

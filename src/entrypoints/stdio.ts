@@ -23,6 +23,8 @@ function main(): void {
     skills: services.skills,
     workspace: services.workspace,
     applyVerify: services.applyVerify,
+    brain: services.brain,
+    contextImpact: services.contextImpact,
   }), {
     legacy: 'reject',
     onerror: (error) => logger.error('stdio_transport_failed', error),

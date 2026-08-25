@@ -1,9 +1,11 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import type { ApplyVerifyService } from './apply-verify-service.js';
+import type { ContextImpactService } from './context-impact-service.js';
 import { HealthService } from './health-service.js';
 import { toPublicError } from './errors.js';
 import type { ProjectDiscoveryService } from './project-discovery-service.js';
+import type { ProjectBrainService } from './project-brain-service.js';
 import type { SecureFilesystemService } from './secure-filesystem-service.js';
 import type { SkillDiscoveryService } from './skill-discovery-service.js';
 import { taskKindSchema, type TaskRunnerService } from './task-runner-service.js';
@@ -16,6 +18,8 @@ export interface McpToolServices {
   skills: SkillDiscoveryService;
   workspace: WorkspaceBootstrapService;
   applyVerify: ApplyVerifyService;
+  brain: ProjectBrainService;
+  contextImpact: ContextImpactService;
 }
 
 const authShape = {
@@ -96,6 +100,36 @@ export function createMcpServer(services?: McpToolServices): McpServer {
     title: 'Read project skill', description: 'Read one recognized project skill/instruction file.',
     inputSchema: z.object({ ...authShape, path: pathSchema }).strict(), annotations: { readOnlyHint: true },
   }, async (input) => { try { return ok(await services.skills.readSkill({ ...authorized(input), path: input.path })); } catch (error) { return failed(error); } });
+
+  server.registerTool('brain_build', {
+    title: 'Build Project Brain', description: 'Build or incrementally refresh the bounded project file/language/TS-JS symbol/import/reference/test/config index.',
+    inputSchema: z.object(authShape).strict(), annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok(await services.brain.build(authorized(input))); } catch (error) { return failed(error); } });
+
+  server.registerTool('brain_status', {
+    title: 'Project Brain status', description: 'Return current Project Brain state, counts, language distribution and index statistics.',
+    inputSchema: z.object(authShape).strict(), annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok(await services.brain.status(authorized(input))); } catch (error) { return failed(error); } });
+
+  server.registerTool('find_symbol', {
+    title: 'Find indexed symbol', description: 'Find TS/JS symbols in the Project Brain using exact-first substring ranking.',
+    inputSchema: z.object({ ...authShape, query: z.string().min(1).max(300), max_results: z.number().int().min(1).max(200).default(50) }).strict(), annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok({ symbols: await services.brain.findSymbols({ ...authorized(input), query: input.query, maxResults: input.max_results }) }); } catch (error) { return failed(error); } });
+
+  server.registerTool('symbol_references', {
+    title: 'Find symbol references', description: 'Return indexed TS/JS identifier references for an exact symbol name.',
+    inputSchema: z.object({ ...authShape, symbol: z.string().min(1).max(300), max_results: z.number().int().min(1).max(500).default(100) }).strict(), annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok({ references: await services.brain.references({ ...authorized(input), symbol: input.symbol, maxResults: input.max_results }) }); } catch (error) { return failed(error); } });
+
+  server.registerTool('context_bundle', {
+    title: 'Retrieve bounded coding context', description: 'Rank graph and literal-text evidence into a bounded source context bundle for coding/review.',
+    inputSchema: z.object({ ...authShape, query: z.string().min(1).max(500), max_files: z.number().int().min(1).max(12).default(8), max_chars: z.number().int().min(2000).max(24000).default(12000) }).strict(), annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok(await services.contextImpact.contextBundle({ ...authorized(input), query: input.query, maxFiles: input.max_files, maxChars: input.max_chars })); } catch (error) { return failed(error); } });
+
+  server.registerTool('impact_analysis', {
+    title: 'Analyze change impact', description: 'Trace a file or exact symbol to declarations, references, importers, related tests and nearby configs.',
+    inputSchema: z.object({ ...authShape, seed: z.string().min(1).max(4096), max_results: z.number().int().min(1).max(200).default(50) }).strict(), annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok(await services.contextImpact.impactAnalysis({ ...authorized(input), seed: input.seed, maxResults: input.max_results })); } catch (error) { return failed(error); } });
 
   const replaceChangeSchema = z.object({
     op: z.literal('replace'), path: pathSchema, search: z.string().min(1).max(1024 * 1024), replacement: z.string().max(1024 * 1024),

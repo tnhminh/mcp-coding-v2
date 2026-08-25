@@ -20,6 +20,8 @@ Verified: `secure-filesystem.test.ts` covers read/stat/list/search, sensitive an
 
 Verified: `task-runner.test.ts` covers structured profile discovery, no caller-controlled shell interpolation, environment isolation, output redaction/capping, timeout and Windows process-tree cleanup. `workspace-bootstrap.test.ts` covers project metadata, task and AGENTS/SKILL discovery. `apply-verify.test.ts` covers successful verification, rollback of existing/new files on failure and explicit no-rollback mode. The HTTP MCP E2E contract exercises list_projects → workspace_bootstrap → run_task → apply_and_verify → policy denial.
 
-Current full gate: 12 test files / 48 tests PASS plus lint, strict typecheck and production build.
+Verified: `project-brain-context.test.ts` covers bounded indexing, TS/JS declarations/import resolution/references, test/config classification, incremental SHA reuse, persisted snapshot reload after runtime recreation, corrupted-snapshot fail-closed behavior, bounded context ranking and declaration→importer→related-test impact analysis. `mcp-filesystem-contract.test.ts` now also exercises brain_build/find_symbol/context_bundle/impact_analysis over real HTTP MCP.
 
-Next: Project Brain index/AST graph tests, then bounded context-ranking and impact-analysis tests.
+Current full gate: 13 test files / 54 tests PASS plus lint, strict typecheck and production build.
+
+Next: autonomous coding-cycle orchestration tests across IMPLEMENT → TEST → REVIEW → FIX retry evidence.

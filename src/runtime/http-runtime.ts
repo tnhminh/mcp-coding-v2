@@ -59,6 +59,8 @@ export async function startHttpRuntime(config: AppConfig, logger: JsonLogger): P
     skills: services.skills,
     workspace: services.workspace,
     applyVerify: services.applyVerify,
+    brain: services.brain,
+    contextImpact: services.contextImpact,
   }), {
     legacy: 'reject',
     onerror: (error) => logger.error('mcp_request_failed', error),

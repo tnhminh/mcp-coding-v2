@@ -36,11 +36,16 @@ Strict TypeScript / Node ESM. MCP composition lives in `src/app/create-mcp-serve
 - structured test/lint/typecheck/check/build/bench runner with command.run authorization, environment/output/time bounds, redaction and process-tree cleanup
 - apply_and_verify orchestration with default rollback on failed verification; real HTTP MCP E2E PASS
 
+- persistent Project Brain with bounded file/language/test/config metadata, TS/JS AST declarations/imports/references and incremental SHA reuse
+- SQLite Brain snapshots survive runtime recreation and corrupted snapshots fail closed
+- brain_build, brain_status, find_symbol, symbol_references, context_bundle and impact_analysis over MCP
+- bounded weighted lexical+graph context retrieval and declaration/reference/importer/related-test impact analysis
+
 ## Current task
-P5-T01 Project Brain file/language/symbol/import/reference/test/config indexing.
+P7-T00 autonomous IMPLEMENT/TEST/REVIEW/FIX coding-cycle orchestration over Brain/Context/Impact + apply_and_verify.
 
 ## Next task
-P5-T02 TS/JS AST graph edges, then P6 bounded context retrieval + impact analysis. Git MCP features remain deferred.
+Complete the safe agent-driven coding cycle and evidence contract; richer BM25/Git/task-aware ranking remains later. Git MCP features remain deferred.
 
 ## Run/test/build
 `npm install`; `npm run dev:stdio`; `npm run dev:http`; `npm run check`.

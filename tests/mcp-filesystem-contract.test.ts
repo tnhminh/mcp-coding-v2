@@ -111,6 +111,20 @@ describe('MCP filesystem vibecode contract', () => {
       const taskOutput = (task.structuredContent as { stdout?: string } | undefined)?.stdout;
       expect(taskOutput).toContain('fixture-pass');
 
+      const brainBuild = await client.callTool({ name: 'brain_build', arguments: { project_id: projectId, permission_session_id: permissionSessionId } });
+      expect(brainBuild.isError, JSON.stringify(brainBuild.content)).not.toBe(true);
+      expect(brainBuild.structuredContent).toMatchObject({ state: 'ready' });
+      const findSymbol = await client.callTool({ name: 'find_symbol', arguments: { project_id: projectId, permission_session_id: permissionSessionId, query: 'answer' } });
+      const brainSymbols = (findSymbol.structuredContent as { symbols?: Array<{ name: string; path: string }> } | undefined)?.symbols ?? [];
+      expect(brainSymbols).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'answer', path: 'src/main.ts' })]));
+      const context = await client.callTool({ name: 'context_bundle', arguments: { project_id: projectId, permission_session_id: permissionSessionId, query: 'answer', max_files: 4, max_chars: 6000 } });
+      const contextItems = (context.structuredContent as { items?: Array<{ path: string }> } | undefined)?.items ?? [];
+      expect(contextItems.map((item) => item.path)).toContain('src/main.ts');
+      const impact = await client.callTool({ name: 'impact_analysis', arguments: { project_id: projectId, permission_session_id: permissionSessionId, seed: 'answer' } });
+      expect(impact.isError, JSON.stringify(impact.content)).not.toBe(true);
+      const declarations = (impact.structuredContent as { declarations?: Array<{ name: string; path: string }> } | undefined)?.declarations ?? [];
+      expect(declarations).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'answer', path: 'src/main.ts' })]));
+
       const read = await client.callTool({ name: 'read_file', arguments: { project_id: projectId, permission_session_id: permissionSessionId, path: 'src/main.ts' } });
       expect(read.isError).not.toBe(true);
       expect(read.structuredContent).toMatchObject({ path: path.join('src', 'main.ts') });

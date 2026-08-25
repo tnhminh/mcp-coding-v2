@@ -60,6 +60,19 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX idx_authorization_policies_capability ON authorization_policies(capability, enabled);
     `,
   },
+  {
+    id: '003_project_brain',
+    sql: `
+      CREATE TABLE project_brain_snapshots (
+        project_id TEXT PRIMARY KEY NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        built_at TEXT NOT NULL,
+        index_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_project_brain_snapshots_built_at ON project_brain_snapshots(built_at DESC);
+    `,
+  },
 ];
 
 export function applyMigrations(database: Database.Database): string[] {

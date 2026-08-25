@@ -19,7 +19,7 @@ Updated: 2026-08-26
 - Structured application error model with safe public projection.
 - JSON logging with reserved-field isolation and sensitive-key redaction; generic internal error messages are not emitted raw.
 - Graceful/idempotent HTTP runtime close verified.
-- `npm run check`: lint + typecheck + 48 tests + build PASS.
+- `npm run check`: lint + typecheck + 54 tests + build PASS.
 - Project aggregate and async repository interface designed for SQLite/PostgreSQL interchangeability.
 - SQLite persistence via `better-sqlite3` 13.0.3 with versioned transactional migration `001_projects`, foreign keys, busy timeout and WAL for file databases.
 - Project persistence verifies complete aggregate round-trip, case-insensitive alias uniqueness, update/delete behavior and JSON-only metadata.
@@ -38,8 +38,13 @@ Updated: 2026-08-26
 - Structured task runner supports test/lint/typecheck/check/build/bench with command.run authorization, bounded env/output/time, output redaction and Windows process-tree cleanup.
 - apply_and_verify applies bounded changes, runs structured verification tasks and rolls back automatically on failure by default; unit and real HTTP MCP E2E contracts PASS.
 
+- Project Brain is live with bounded file/language/test/config indexing, TS/JS AST declarations/imports/references, SHA-based incremental refresh and SQLite-persisted snapshots.
+- Brain snapshot state survives runtime recreation; corrupt snapshots are deleted and fail closed to `not_indexed`.
+- `brain_build`, `brain_status`, `find_symbol`, `symbol_references`, `context_bundle` and `impact_analysis` are exposed over stdio + HTTP MCP and covered by real HTTP E2E.
+- Context retrieval is bounded weighted lexical+graph ranking; impact analysis traces declarations/references/importers/related tests/configs. This is not claimed to be BM25 or Git-aware yet.
+
 ## Active
-P5-T01 — Project Brain file/language/symbol/import/reference/test/config indexing, followed by context and impact analysis. Git feature work is intentionally deferred.
+P7-T00 — autonomous IMPLEMENT/TEST/REVIEW/FIX coding-cycle orchestration using Project Brain/Context/Impact + apply_and_verify. Git feature work is intentionally deferred.
 
 ## Known gaps
-Production identity/authentication, audit and multi-user RBAC remain incomplete. Project Brain/context, browser/remote/deploy engines and broader observability remain incomplete. Git integration is deferred while local-project coding completeness is prioritized.
+Production identity/authentication, audit and multi-user RBAC remain incomplete. Richer BM25/Git/task-aware retrieval, browser/remote/deploy engines and broader observability remain incomplete. Git integration is deferred while local-project coding completeness is prioritized.

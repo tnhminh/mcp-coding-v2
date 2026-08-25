@@ -105,7 +105,7 @@ export class ControlCenterService {
       { id: 'policies', label: 'Policies', state: 'available' },
       { id: 'filesystem', label: 'Filesystem', state: 'available' },
       { id: 'commands', label: 'Tasks / Commands', state: 'available' },
-      { id: 'brain', label: 'Project Brain', state: 'planned' },
+      { id: 'brain', label: 'Project Brain', state: 'available' },
       { id: 'git', label: 'Git / GitHub', state: 'planned' },
       { id: 'browser', label: 'Browser / Preview', state: 'planned' },
       { id: 'remote', label: 'Remote / Deploy', state: 'planned' },
