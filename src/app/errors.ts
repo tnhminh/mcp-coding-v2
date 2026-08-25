@@ -8,7 +8,13 @@ export type ErrorCode =
   | 'PATH_INVALID'
   | 'PATH_NOT_FOUND'
   | 'PATH_OUTSIDE_PROJECT'
-  | 'PROJECT_ROOT_CONFLICT';
+  | 'PROJECT_ROOT_CONFLICT'
+  | 'PERMISSION_REQUIRED'
+  | 'PERMISSION_EXPIRED'
+  | 'AUTHORIZATION_DENIED'
+  | 'POLICY_DENIED'
+  | 'COMMAND_FAILED'
+  | 'OUTPUT_LIMIT_EXCEEDED';
 
 export interface AppErrorOptions {
   code: ErrorCode;

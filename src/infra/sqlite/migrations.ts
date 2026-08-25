@@ -27,6 +27,39 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX idx_projects_brain_status ON projects(brain_status);
     `,
   },
+  {
+    id: '002_authorization',
+    sql: `
+      CREATE TABLE permission_sessions (
+        id TEXT PRIMARY KEY NOT NULL,
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        principal_id TEXT NOT NULL,
+        capabilities_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        revoked_at TEXT,
+        note TEXT
+      );
+
+      CREATE INDEX idx_permission_sessions_project ON permission_sessions(project_id, created_at DESC);
+      CREATE INDEX idx_permission_sessions_expiry ON permission_sessions(expires_at);
+
+      CREATE TABLE authorization_policies (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+        capability TEXT NOT NULL CHECK (capability IN ('filesystem.read', 'filesystem.write', 'command.run', 'git.read', 'git.write')),
+        effect TEXT NOT NULL CHECK (effect IN ('allow', 'deny')),
+        enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+        reason TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_authorization_policies_project ON authorization_policies(project_id, enabled);
+      CREATE INDEX idx_authorization_policies_capability ON authorization_policies(capability, enabled);
+    `,
+  },
 ];
 
 export function applyMigrations(database: Database.Database): string[] {

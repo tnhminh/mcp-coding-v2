@@ -45,7 +45,54 @@ describe('Control Center', () => {
     const data = await overview.json() as { counts: { projects: number }; modules: Array<{ id: string; state: string }> };
     expect(data.counts.projects).toBe(0);
     expect(data.modules.find((module) => module.id === 'projects')?.state).toBe('available');
-    expect(data.modules.find((module) => module.id === 'permissions')?.state).toBe('in_development');
+    expect(data.modules.find((module) => module.id === 'permissions')?.state).toBe('available');
+    expect(data.modules.find((module) => module.id === 'policies')?.state).toBe('available');
+  });
+
+  test('creates permission sessions and policies through human-facing CMS APIs', async () => {
+    workspace = await mkdtemp(path.join(tmpdir(), 'mcp-cc-auth-'));
+    const projectRoot = path.join(workspace, 'auth-project');
+    await mkdir(projectRoot, { recursive: true });
+    const port = await reservePort();
+    runtime = await startHttpRuntime(
+      { host: '127.0.0.1', port, logLevel: 'error', databasePath: ':memory:' },
+      new JsonLogger('error', () => undefined),
+    );
+
+    const createdProject = await fetch(`http://127.0.0.1:${port}/api/projects`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Auth Project', alias: 'auth-project', rootPath: projectRoot }),
+    });
+    const project = (await createdProject.json() as { project: { id: string } }).project;
+
+    const createdSession = await fetch(`http://127.0.0.1:${port}/api/projects/${project.id}/permission-sessions`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ principalId: 'local-agent', capabilities: ['filesystem.read', 'filesystem.write'], ttlSeconds: 3600 }),
+    });
+    expect(createdSession.status).toBe(201);
+    const session = (await createdSession.json() as { permissionSession: { id: string } }).permissionSession;
+
+    const sessionList = await fetch(`http://127.0.0.1:${port}/api/projects/${project.id}/permission-sessions`);
+    expect((await sessionList.json() as { permissionSessions: unknown[] }).permissionSessions).toHaveLength(1);
+
+    const policyResponse = await fetch(`http://127.0.0.1:${port}/api/policies`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'deny-write', projectId: project.id, capability: 'filesystem.write', effect: 'deny', reason: 'freeze' }),
+    });
+    expect(policyResponse.status).toBe(201);
+    const policy = (await policyResponse.json() as { policy: { id: string } }).policy;
+
+    const overview = await fetch(`http://127.0.0.1:${port}/api/control-center/overview`).then((response) => response.json()) as { counts: { permissionSessions: number; policies: number } };
+    expect(overview.counts.permissionSessions).toBe(1);
+    expect(overview.counts.policies).toBe(1);
+
+    const disabled = await fetch(`http://127.0.0.1:${port}/api/policies/${policy.id}`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enabled: false }),
+    });
+    expect((await disabled.json() as { policy: { enabled: boolean } }).policy.enabled).toBe(false);
+
+    expect((await fetch(`http://127.0.0.1:${port}/api/permission-sessions/${session.id}/revoke`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status).toBe(200);
+    expect((await fetch(`http://127.0.0.1:${port}/api/policies/${policy.id}`, { method: 'DELETE' })).status).toBe(200);
   });
 
   test('creates, updates, lists and removes projects through CMS APIs', async () => {

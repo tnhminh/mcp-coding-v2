@@ -24,12 +24,15 @@ Strict TypeScript / Node ESM. MCP composition lives in `src/app/create-mcp-serve
 - localhost Control Center at `/control-center`
 - persistent SQLite-backed Project Registry CRUD via Control Center API
 - real Overview, MCP/tool status and effective runtime Settings panels; unfinished modules are explicitly disabled
+- temporary project-bound permission sessions with TTL/revoke and fixed capability catalog
+- global/project authorization policies with deny override semantics
+- real Permissions/Policies Control Center configuration
 
 ## Current task
-P2.5-T02: implement P2-T03 capability/temporary permission sessions and expose them through the Control Center.
+P3-T01 secure filesystem read/stat/list/search primitives, guarded by authorization and canonical project-root resolution.
 
 ## Next task
-P2-T04 global/project policy persistence and deterministic enforcement hooks, wired into the same Control Center shell.
+P3-T02 atomic safe write/append restrictions after P3-T01 passes.
 
 ## Run/test/build
 `npm install`; `npm run dev:stdio`; `npm run dev:http`; `npm run check`.

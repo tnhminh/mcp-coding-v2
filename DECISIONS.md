@@ -23,3 +23,6 @@ The built-in Node 24 `node:sqlite` API still emits an ExperimentalWarning, so lo
 
 ## ADR-008 — Registry-aware canonical path isolation
 Path authorization uses canonical `realpath` roots and a resolver factory built from the current project registry snapshot. A parent project excludes nested registered project roots; duplicate projects resolving to the same canonical root are rejected. Existing paths are realpath-checked and write targets resolve through their nearest existing ancestor. Windows unsafe path forms are rejected. P3 operations must still mitigate TOCTOU between resolution and filesystem mutation.
+
+## ADR-009 — Human-issued temporary capability sessions with deny override
+Privileged local coding operations require a project-bound permission session issued through the localhost Control Center. Sessions carry an explicit fixed capability set, expire after at most 24 hours and can be revoked immediately. Policies do not grant capability: a valid session grant is always required. Enabled global or project-scoped `deny` policies override matching session grants. This prevents repository prompts or MCP callers from self-elevating by supplying a policy-like request.

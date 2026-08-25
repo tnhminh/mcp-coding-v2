@@ -30,17 +30,20 @@ Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
   - Evidence: versioned/idempotent migration, complete aggregate round-trip, async repository contract, uniqueness/update/delete and JSON metadata tests PASS.
 - [x] P2-T02 Canonical root/path resolver and cross-project isolation tests.
   - Evidence: traversal, absolute escape, junction/symlink escape, nested-project exclusion, duplicate canonical-root conflict and Windows unsafe-path tests PASS through registry-aware resolver factory.
-- [ ] P2-T03 Capability model and temporary permission sessions.
-- [ ] P2-T04 Global/project policy persistence and deterministic enforcement hooks.
+- [x] P2-T03 Capability model and temporary permission sessions.
+  - Evidence: project-bound capability grants with 60s–24h TTL, revoke/expiry enforcement, inactive/wrong-project rejection and CMS issuance/revocation tests PASS.
+- [x] P2-T04 Global/project policy persistence and deterministic enforcement hooks.
+  - Evidence: SQLite-backed global/project policies; enabled deny rules override valid session grants; CMS create/update/delete controls and authorization tests PASS.
 
 ## EPIC P2.5 — Control Center Foundation
 - [x] P2.5-T01 Operations shell + real Overview/Projects/MCP/Settings APIs.
   - Evidence: localhost `/control-center`, persistent SQLite Project CRUD, effective runtime settings, exposed-tool/module state, API validation tests; full gate PASS.
-- [~] P2.5-T02 Wire capability sessions and policy controls as P2-T03/P2-T04 land.
+- [x] P2.5-T02 Wire capability sessions and policy controls as P2-T03/P2-T04 land.
+  - Evidence: Control Center issues/revokes temporary sessions and manages global/project policies over real localhost APIs.
 - [ ] P2.5-T03 Add audit/activity stream and operational diagnostics.
 
 ## EPIC P3 — Secure Filesystem
-- [ ] P3-T01 Safe read/stat/list/search primitives.
+- [~] P3-T01 Safe read/stat/list/search primitives.
 - [ ] P3-T02 Atomic create/write/append with size/binary/secret restrictions.
 - [ ] P3-T03 Patch/batch patch + diff + optimistic SHA-256 concurrency.
 - [ ] P3-T04 copy/move/delete with backup and symlink/traversal adversarial tests.

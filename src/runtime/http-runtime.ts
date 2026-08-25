@@ -12,6 +12,8 @@ import { controlCenterCss, controlCenterHtml, controlCenterJs } from '../control
 import { JsonLogger } from '../infra/json-logger.js';
 import { openSqliteDatabase } from '../infra/sqlite/database.js';
 import { SqliteProjectRepository } from '../infra/sqlite/sqlite-project-repository.js';
+import { SqlitePermissionSessionRepository } from '../infra/sqlite/sqlite-permission-session-repository.js';
+import { SqlitePolicyRepository } from '../infra/sqlite/sqlite-policy-repository.js';
 
 export interface HttpRuntime {
   server: Server;
@@ -50,7 +52,9 @@ export async function startHttpRuntime(config: AppConfig, logger: JsonLogger): P
   if (databaseFilename !== ':memory:') await mkdir(path.dirname(databaseFilename), { recursive: true });
   const database = openSqliteDatabase(databaseFilename);
   const projects = new SqliteProjectRepository(database.database);
-  const controlCenter = new ControlCenterService(projects, { ...config, databasePath: databaseFilename });
+  const permissionSessions = new SqlitePermissionSessionRepository(database.database);
+  const policies = new SqlitePolicyRepository(database.database);
+  const controlCenter = new ControlCenterService(projects, permissionSessions, policies, { ...config, databasePath: databaseFilename });
   const mcpHandler = createMcpHandler(() => createMcpServer(), {
     legacy: 'reject',
     onerror: (error) => logger.error('mcp_request_failed', error),
@@ -113,6 +117,45 @@ export async function startHttpRuntime(config: AppConfig, logger: JsonLogger): P
         }
         if (req.method === 'DELETE') {
           await controlCenter.removeProject(projectId);
+          writeJson(res, 200, { removed: true });
+          return;
+        }
+      }
+      const projectSessionsMatch = /^\/api\/projects\/([^/]+)\/permission-sessions$/u.exec(pathname);
+      if (projectSessionsMatch) {
+        const projectId = decodeURIComponent(projectSessionsMatch[1] ?? '');
+        if (req.method === 'GET') {
+          writeJson(res, 200, { permissionSessions: await controlCenter.listPermissionSessions(projectId) });
+          return;
+        }
+        if (req.method === 'POST') {
+          writeJson(res, 201, { permissionSession: await controlCenter.createPermissionSession(projectId, await readJsonBody(req)) });
+          return;
+        }
+      }
+      const revokeSessionMatch = /^\/api\/permission-sessions\/([^/]+)\/revoke$/u.exec(pathname);
+      if (revokeSessionMatch && req.method === 'POST') {
+        await controlCenter.revokePermissionSession(decodeURIComponent(revokeSessionMatch[1] ?? ''));
+        writeJson(res, 200, { revoked: true });
+        return;
+      }
+      if (pathname === '/api/policies' && req.method === 'GET') {
+        writeJson(res, 200, { policies: await controlCenter.listPolicies() });
+        return;
+      }
+      if (pathname === '/api/policies' && req.method === 'POST') {
+        writeJson(res, 201, { policy: await controlCenter.createPolicy(await readJsonBody(req)) });
+        return;
+      }
+      const policyMatch = /^\/api\/policies\/([^/]+)$/u.exec(pathname);
+      if (policyMatch) {
+        const policyId = decodeURIComponent(policyMatch[1] ?? '');
+        if (req.method === 'PUT') {
+          writeJson(res, 200, { policy: await controlCenter.updatePolicy(policyId, await readJsonBody(req)) });
+          return;
+        }
+        if (req.method === 'DELETE') {
+          await controlCenter.removePolicy(policyId);
           writeJson(res, 200, { removed: true });
           return;
         }

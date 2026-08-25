@@ -23,3 +23,6 @@
 - Added the first real Control Center at `/control-center` with a professional operations shell, Overview, Projects, MCP/Tools and Settings.
 - Wired HTTP runtime to persistent SQLite via `MCP_DATABASE_PATH` and exposed validated localhost-only Project Registry CRUD APIs.
 - Added Control Center integration tests for page/API contracts, project create/update/list/remove and invalid edit validation.
+- Added P2 authorization capability catalog and temporary project-bound permission sessions with TTL/revoke semantics.
+- Added SQLite-backed global/project authorization policies with deterministic deny override enforcement.
+- Activated real Permissions and Policies Control Center controls and HTTP APIs.

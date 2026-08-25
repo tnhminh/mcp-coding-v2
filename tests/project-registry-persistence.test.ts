@@ -13,10 +13,10 @@ describe('project registry persistence', () => {
   test('versioned migration applies exactly once', () => {
     const handle = openSqliteDatabase(':memory:');
     try {
-      expect(handle.appliedMigrations).toEqual(['001_projects']);
+      expect(handle.appliedMigrations).toEqual(['001_projects', '002_authorization']);
       expect(applyMigrations(handle.database)).toEqual([]);
       const rows = handle.database.prepare('SELECT id FROM schema_migrations').all() as Array<{ id: string }>;
-      expect(rows.map((row) => row.id)).toEqual(['001_projects']);
+      expect(rows.map((row) => row.id)).toEqual(['001_projects', '002_authorization']);
     } finally {
       handle.close();
     }
