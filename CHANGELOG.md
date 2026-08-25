@@ -18,3 +18,5 @@
 - Added Project aggregate and Promise-based repository abstraction for future PostgreSQL compatibility.
 - Added pinned `better-sqlite3` persistence, versioned transactional schema migrations and Project Registry persistence tests.
 - Raised Node engine floor to 22.13.0 to match the selected SQLite driver and current tooling support floor.
+- Added registry-aware canonical project path resolution with sibling/nested project isolation and duplicate canonical-root rejection.
+- Added traversal, junction/symlink and Windows alternate-stream/device-name/path-normalization adversarial tests.

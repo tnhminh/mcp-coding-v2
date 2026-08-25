@@ -10,4 +10,6 @@ Verified: config validation, safe public-error projection, JSON log redaction/re
 
 Verified: Project Registry persistence covers migration idempotency, complete aggregate round-trip, async failure semantics, case-insensitive alias uniqueness, updates/removal and JSON-only metadata.
 
-Next: canonical path/symlink/cross-project isolation adversarial tests, then permission/policy tests.
+Verified: `project-path-resolver.test.ts` covers lexical/absolute traversal, missing/write targets, junction/symlink escape, safe internal links, sibling/nested project isolation, duplicate canonical roots, registry factory enforcement and Windows unsafe-path forms.
+
+Next: capability/temporary permission-session tests, then policy persistence/enforcement tests.

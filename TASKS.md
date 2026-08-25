@@ -28,8 +28,9 @@ Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
 ## EPIC P2 — Project Registry / Permissions / Rules
 - [x] P2-T01 Project aggregate + repository interface + SQLite migration.
   - Evidence: versioned/idempotent migration, complete aggregate round-trip, async repository contract, uniqueness/update/delete and JSON metadata tests PASS.
-- [~] P2-T02 Canonical root/path resolver and cross-project isolation tests.
-- [ ] P2-T03 Capability model and temporary permission sessions.
+- [x] P2-T02 Canonical root/path resolver and cross-project isolation tests.
+  - Evidence: traversal, absolute escape, junction/symlink escape, nested-project exclusion, duplicate canonical-root conflict and Windows unsafe-path tests PASS through registry-aware resolver factory.
+- [~] P2-T03 Capability model and temporary permission sessions.
 - [ ] P2-T04 Global/project policy persistence and deterministic enforcement hooks.
 
 ## EPIC P3 — Secure Filesystem

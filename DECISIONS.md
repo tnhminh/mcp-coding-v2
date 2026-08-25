@@ -20,3 +20,6 @@ Until remote authentication/authorization is implemented, configuration accepts 
 
 ## ADR-007 — Stable SQLite driver behind async repository contracts
 The built-in Node 24 `node:sqlite` API still emits an ExperimentalWarning, so local persistence uses pinned `better-sqlite3` 13.0.3. Domain repository interfaces remain Promise-based so a future PostgreSQL adapter does not require application-layer contract changes. The runtime engine floor is Node 22.13.0 so both the SQLite driver and the current validation/tooling stack have a supported Node 22 baseline.
+
+## ADR-008 — Registry-aware canonical path isolation
+Path authorization uses canonical `realpath` roots and a resolver factory built from the current project registry snapshot. A parent project excludes nested registered project roots; duplicate projects resolving to the same canonical root are rejected. Existing paths are realpath-checked and write targets resolve through their nearest existing ancestor. Windows unsafe path forms are rejected. P3 operations must still mitigate TOCTOU between resolution and filesystem mutation.

@@ -2,7 +2,11 @@ export type ErrorCode =
   | 'CONFIG_INVALID'
   | 'NOT_FOUND'
   | 'INTERNAL_ERROR'
-  | 'SERVICE_UNAVAILABLE';
+  | 'SERVICE_UNAVAILABLE'
+  | 'PATH_INVALID'
+  | 'PATH_NOT_FOUND'
+  | 'PATH_OUTSIDE_PROJECT'
+  | 'PROJECT_ROOT_CONFLICT';
 
 export interface AppErrorOptions {
   code: ErrorCode;

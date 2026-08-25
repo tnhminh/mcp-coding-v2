@@ -9,7 +9,7 @@ Status: **FAIL — INCOMPLETE** (2026-08-25)
 | Streamable HTTP bootstrap | PASS | 2026-07-28 negotiation + tools/list/tools/call contract test passes |
 | schema/invalid-request contract suite | PASS | unknown tool => ProtocolError -32602; strict tool input => isError validation result over stdio + HTTP |
 | authentication/RBAC | FAIL | not implemented |
-| project/path isolation | FAIL | project persistence foundation PASS; canonical path and cross-project isolation are P2-T02 pending |
+| project/path isolation | PASS | registry-aware canonical resolver; traversal, symlink/junction, nested-project and Windows unsafe-path adversarial tests PASS |
 | command policies | FAIL | not implemented |
 | secret redaction | FAIL | JSON logger redacts sensitive field keys, but full secret-reference/scanning coverage is not implemented |
 | workflow recovery | FAIL | not implemented |

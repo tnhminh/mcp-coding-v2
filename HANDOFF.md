@@ -19,12 +19,14 @@ Strict TypeScript / Node ESM. MCP composition lives in `src/app/create-mcp-serve
 - testable HTTP runtime with idempotent graceful close
 - Project domain aggregate + async repository abstraction
 - SQLite adapter with versioned transactional migrations and tested persistence semantics
+- registry-aware canonical path resolver with nested-project exclusions
+- traversal, junction/symlink and Windows unsafe-path adversarial coverage
 
 ## Current task
-P2-T02 canonical root/path resolver and cross-project isolation tests.
+P2-T03 capability model and temporary permission sessions.
 
 ## Next task
-P2-T03 capability model and temporary permission sessions after P2-T02 passes.
+P2-T04 global/project policy persistence and deterministic enforcement hooks after P2-T03 passes.
 
 ## Run/test/build
 `npm install`; `npm run dev:stdio`; `npm run dev:http`; `npm run check`.
