@@ -8,4 +8,6 @@ Verified: official MCP v2 client contract tests negotiate 2026-07-28 over spawne
 
 Verified: config validation, safe public-error projection, JSON log redaction/reserved-field integrity and idempotent HTTP runtime shutdown are covered by `runtime-foundation.test.ts`.
 
-Next: project registry repository/migration tests, path-isolation adversarial tests and permission/policy tests.
+Verified: Project Registry persistence covers migration idempotency, complete aggregate round-trip, async failure semantics, case-insensitive alias uniqueness, updates/removal and JSON-only metadata.
+
+Next: canonical path/symlink/cross-project isolation adversarial tests, then permission/policy tests.

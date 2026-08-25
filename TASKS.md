@@ -26,8 +26,9 @@ Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
   - Evidence: secure loopback-only config validation, typed public error projection, structured/redacted JSON logs and idempotent HTTP shutdown tests; full `npm run check` PASS.
 
 ## EPIC P2 — Project Registry / Permissions / Rules
-- [~] P2-T01 Project aggregate + repository interface + SQLite migration.
-- [ ] P2-T02 Canonical root/path resolver and cross-project isolation tests.
+- [x] P2-T01 Project aggregate + repository interface + SQLite migration.
+  - Evidence: versioned/idempotent migration, complete aggregate round-trip, async repository contract, uniqueness/update/delete and JSON metadata tests PASS.
+- [~] P2-T02 Canonical root/path resolver and cross-project isolation tests.
 - [ ] P2-T03 Capability model and temporary permission sessions.
 - [ ] P2-T04 Global/project policy persistence and deterministic enforcement hooks.
 

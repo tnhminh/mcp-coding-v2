@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "dev:stdio": "tsx src/entrypoints/stdio.ts",
@@ -18,11 +18,13 @@
   "dependencies": {
     "@modelcontextprotocol/node": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",
+    "better-sqlite3": "13.0.3",
     "zod": "4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@modelcontextprotocol/client": "^2.0.0",
+    "@types/better-sqlite3": "9.6.0",
     "@types/node": "^24.0.0",
     "eslint": "^9.0.0",
     "tsx": "^4.20.0",

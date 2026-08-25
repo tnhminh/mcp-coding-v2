@@ -19,10 +19,13 @@ Updated: 2026-08-25
 - Structured application error model with safe public projection.
 - JSON logging with reserved-field isolation and sensitive-key redaction; generic internal error messages are not emitted raw.
 - Graceful/idempotent HTTP runtime close verified.
-- `npm run check`: lint + typecheck + 7 tests + build PASS.
+- `npm run check`: lint + typecheck + 12 tests + build PASS.
+- Project aggregate and async repository interface designed for SQLite/PostgreSQL interchangeability.
+- SQLite persistence via `better-sqlite3` 13.0.3 with versioned transactional migration `001_projects`, foreign keys, busy timeout and WAL for file databases.
+- Project persistence verifies complete aggregate round-trip, case-insensitive alias uniqueness, update/delete behavior and JSON-only metadata.
 
 ## Active
-P2-T01 Project aggregate + repository interface + SQLite migration.
+P2-T02 Canonical root/path resolver and cross-project isolation tests.
 
 ## Known gaps
 All Phase 2+ subsystems and most Phase 1 production concerns remain unimplemented. No production auth, persistence, project registry, filesystem engine, command runner, brain, workflow, Git/browser/remote/deploy engine, observability stack or Control Center yet.

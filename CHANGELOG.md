@@ -15,3 +15,6 @@
 - Added structured application errors and safe public HTTP error projection.
 - Added JSON logger with reserved-field isolation and sensitive-key redaction.
 - Extracted a testable HTTP runtime and verified idempotent graceful shutdown.
+- Added Project aggregate and Promise-based repository abstraction for future PostgreSQL compatibility.
+- Added pinned `better-sqlite3` persistence, versioned transactional schema migrations and Project Registry persistence tests.
+- Raised Node engine floor to 22.13.0 to match the selected SQLite driver and current tooling support floor.

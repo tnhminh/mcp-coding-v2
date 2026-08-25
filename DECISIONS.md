@@ -17,3 +17,6 @@ Direct NodeStreamableHTTPServerTransport wiring is a legacy/stateless transport 
 
 ## ADR-006 — No unauthenticated non-loopback HTTP
 Until remote authentication/authorization is implemented, configuration accepts only loopback hosts. Runtime failures use typed errors and structured JSON logs; arbitrary caller fields cannot overwrite reserved log keys.
+
+## ADR-007 — Stable SQLite driver behind async repository contracts
+The built-in Node 24 `node:sqlite` API still emits an ExperimentalWarning, so local persistence uses pinned `better-sqlite3` 13.0.3. Domain repository interfaces remain Promise-based so a future PostgreSQL adapter does not require application-layer contract changes. The runtime engine floor is Node 22.13.0 so both the SQLite driver and the current validation/tooling stack have a supported Node 22 baseline.
