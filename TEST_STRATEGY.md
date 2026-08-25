@@ -12,4 +12,6 @@ Verified: Project Registry persistence covers migration idempotency, complete ag
 
 Verified: `project-path-resolver.test.ts` covers lexical/absolute traversal, missing/write targets, junction/symlink escape, safe internal links, sibling/nested project isolation, duplicate canonical roots, registry factory enforcement and Windows unsafe-path forms.
 
-Next: capability/temporary permission-session tests, then policy persistence/enforcement tests.
+Verified: `control-center.test.ts` exercises the real dashboard route and Overview API plus Project Registry create/update/list/remove over HTTP, including invalid alias edit rejection. The Control Center exposes pending modules honestly instead of simulating backend availability.
+
+Next: capability/temporary permission-session tests and Control Center wiring, then policy persistence/enforcement tests.

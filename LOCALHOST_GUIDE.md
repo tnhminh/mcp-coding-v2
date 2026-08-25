@@ -44,6 +44,7 @@ Default listener:
 
 - Host: `127.0.0.1`
 - Port: `7317`
+- Control Center: `http://127.0.0.1:7317/control-center`
 - MCP endpoint: `http://127.0.0.1:7317/mcp`
 - Liveness: `http://127.0.0.1:7317/health/live`
 - Readiness: `http://127.0.0.1:7317/health/ready`
@@ -76,7 +77,19 @@ Invoke-WebRequest -UseBasicParsing http://127.0.0.1:7317/health/ready
 
 Both endpoints should return HTTP `200` and a small JSON payload with `service`, `version`, `status` and `timestamp`.
 
-## 7. Connect an MCP client over HTTP
+## 7. Use the Control Center
+
+Open:
+
+```text
+http://127.0.0.1:7317/control-center
+```
+
+The current CMS/operations surface is backed by real APIs. You can view live Overview/runtime state and add, edit, enable/disable or remove Project Registry entries. Removing a registry entry does not delete files on disk. MCP/Tools and Settings show the effective backend state. Permissions and Policies intentionally remain disabled until P2-T03/P2-T04 backend authorization is verified.
+
+Project Registry data persists by default in `.runtime/mcp-coding-v2.sqlite`. Override the database location with `MCP_DATABASE_PATH` when required.
+
+## 8. Connect an MCP client over HTTP
 
 Use this Streamable HTTP endpoint:
 
@@ -92,7 +105,7 @@ The currently exposed MCP tool is:
 
 Project Registry and path-isolation foundations exist internally but are not yet exposed as project-management/filesystem MCP tools. Those capabilities will be added in later implementation phases.
 
-## 8. Use stdio instead of HTTP
+## 9. Use stdio instead of HTTP
 
 Development stdio:
 
@@ -110,7 +123,7 @@ npm run start:stdio
 
 For a local MCP client that launches servers itself, configure it to execute the stdio command from `E:\mcp-coding-v2` rather than using the HTTP URL.
 
-## 9. Override localhost port or log level
+## 10. Override localhost port or log level
 
 Example:
 
@@ -122,7 +135,7 @@ npm run start:http
 
 Allowed HTTP hosts are intentionally restricted to loopback values: `127.0.0.1`, `localhost`, or `::1`. Non-loopback exposure is blocked until authentication/authorization for remote access is implemented.
 
-## 10. Check which process owns the port
+## 11. Check which process owns the port
 
 ```powershell
 Get-NetTCPConnection -LocalPort 7317 -State Listen |
@@ -136,7 +149,7 @@ Get-CimInstance Win32_Process -Filter "ProcessId = <PID>" |
   Select-Object ProcessId,Name,CommandLine
 ```
 
-## 11. Stop the localhost server
+## 12. Stop the localhost server
 
 If it is running in the foreground, press `Ctrl+C` so graceful shutdown can run.
 
@@ -148,7 +161,7 @@ Stop-Process -Id <PID>
 
 Do not kill a PID until the command line has been verified.
 
-## 12. Restart after source changes
+## 13. Restart after source changes
 
 For development mode, stop and rerun:
 
@@ -164,7 +177,7 @@ npm run build
 npm run start:http
 ```
 
-## 13. Troubleshooting
+## 14. Troubleshooting
 
 ### Port 7317 already in use
 
@@ -194,6 +207,6 @@ Confirm in order:
 4. Client supports modern Streamable HTTP MCP.
 5. The client is running on the same machine or can actually reach this localhost. A cloud-hosted client cannot directly reach the PC's `127.0.0.1`.
 
-## 14. Current limitations
+## 15. Current limitations
 
-This repository is still in development. The localhost MCP service is usable for the currently implemented MCP surface, but it is not yet the final production system. Authentication/RBAC, permission sessions, secure filesystem tool families, command runner, Brain, workflows, Git/browser/remote/deploy engines and the Control Center UI are still being implemented. See `STATUS.md`, `TASKS.md` and `PRODUCTION_READINESS_REPORT.md` for verified status.
+This repository is still in development. The localhost MCP service is usable for the currently implemented MCP surface, but it is not yet the final production system. Authentication/RBAC, permission sessions, policies, secure filesystem tool families, command runner, Brain, workflows and Git/browser/remote/deploy engines are still being implemented. The Control Center foundation exists now, but unfinished modules remain intentionally disabled until their backend is verified. See `STATUS.md`, `TASKS.md` and `PRODUCTION_READINESS_REPORT.md` for verified status.

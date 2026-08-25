@@ -1,5 +1,7 @@
 export type ErrorCode =
   | 'CONFIG_INVALID'
+  | 'VALIDATION_ERROR'
+  | 'CONFLICT'
   | 'NOT_FOUND'
   | 'INTERNAL_ERROR'
   | 'SERVICE_UNAVAILABLE'

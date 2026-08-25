@@ -16,7 +16,7 @@ Status: **FAIL — INCOMPLETE** (2026-08-25)
 | full unit/integration/e2e/browser/deploy/rollback suites | FAIL | incomplete |
 | logs/metrics/traces/alerts | FAIL | structured JSON logs PASS; metrics/traces/alerts pending |
 | backup/restore/runbook qualification | FAIL | incomplete |
-| Control Center | FAIL | not implemented |
+| Control Center | FAIL | foundation PASS: `/control-center`, Overview, Project CRUD, MCP/tools and runtime Settings are real; full operations modules remain incomplete |
 | docs/handoff baseline | PASS | current files present, explicitly mark gaps |
 
 Production Ready may only be declared when every applicable row is PASS with machine-verifiable evidence.

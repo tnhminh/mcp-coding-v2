@@ -8,6 +8,7 @@ const configSchema = z.object({
   MCP_HOST: loopbackHostSchema.default('127.0.0.1'),
   MCP_PORT: z.coerce.number().int().min(1).max(65_535).default(7317),
   LOG_LEVEL: logLevelSchema.default('info'),
+  MCP_DATABASE_PATH: z.string().trim().min(1).max(4096).default('.runtime/mcp-coding-v2.sqlite'),
 });
 
 export type LogLevel = z.infer<typeof logLevelSchema>;
@@ -16,6 +17,7 @@ export interface AppConfig {
   host: z.infer<typeof loopbackHostSchema>;
   port: number;
   logLevel: LogLevel;
+  databasePath: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -23,6 +25,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     MCP_HOST: env.MCP_HOST,
     MCP_PORT: env.MCP_PORT,
     LOG_LEVEL: env.LOG_LEVEL,
+    MCP_DATABASE_PATH: env.MCP_DATABASE_PATH,
   });
 
   if (!result.success) {
@@ -40,5 +43,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     host: result.data.MCP_HOST,
     port: result.data.MCP_PORT,
     logLevel: result.data.LOG_LEVEL,
+    databasePath: result.data.MCP_DATABASE_PATH,
   };
 }

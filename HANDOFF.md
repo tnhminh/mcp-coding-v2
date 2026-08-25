@@ -21,18 +21,21 @@ Strict TypeScript / Node ESM. MCP composition lives in `src/app/create-mcp-serve
 - SQLite adapter with versioned transactional migrations and tested persistence semantics
 - registry-aware canonical path resolver with nested-project exclusions
 - traversal, junction/symlink and Windows unsafe-path adversarial coverage
+- localhost Control Center at `/control-center`
+- persistent SQLite-backed Project Registry CRUD via Control Center API
+- real Overview, MCP/tool status and effective runtime Settings panels; unfinished modules are explicitly disabled
 
 ## Current task
-P2-T03 capability model and temporary permission sessions.
+P2.5-T02: implement P2-T03 capability/temporary permission sessions and expose them through the Control Center.
 
 ## Next task
-P2-T04 global/project policy persistence and deterministic enforcement hooks after P2-T03 passes.
+P2-T04 global/project policy persistence and deterministic enforcement hooks, wired into the same Control Center shell.
 
 ## Run/test/build
 `npm install`; `npm run dev:stdio`; `npm run dev:http`; `npm run check`.
 
 ## Environment names
-`MCP_HOST`, `MCP_PORT`, `LOG_LEVEL`. No secrets required yet. `MCP_HOST` is intentionally limited to loopback values until remote authentication is implemented.
+`MCP_HOST`, `MCP_PORT`, `LOG_LEVEL`, `MCP_DATABASE_PATH`. No secrets required yet. `MCP_HOST` is intentionally limited to loopback values until remote authentication is implemented.
 
 ## Known defects/blockers
 No external blocker. Feature coverage is intentionally incomplete.

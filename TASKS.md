@@ -30,8 +30,14 @@ Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
   - Evidence: versioned/idempotent migration, complete aggregate round-trip, async repository contract, uniqueness/update/delete and JSON metadata tests PASS.
 - [x] P2-T02 Canonical root/path resolver and cross-project isolation tests.
   - Evidence: traversal, absolute escape, junction/symlink escape, nested-project exclusion, duplicate canonical-root conflict and Windows unsafe-path tests PASS through registry-aware resolver factory.
-- [~] P2-T03 Capability model and temporary permission sessions.
+- [ ] P2-T03 Capability model and temporary permission sessions.
 - [ ] P2-T04 Global/project policy persistence and deterministic enforcement hooks.
+
+## EPIC P2.5 — Control Center Foundation
+- [x] P2.5-T01 Operations shell + real Overview/Projects/MCP/Settings APIs.
+  - Evidence: localhost `/control-center`, persistent SQLite Project CRUD, effective runtime settings, exposed-tool/module state, API validation tests; full gate PASS.
+- [~] P2.5-T02 Wire capability sessions and policy controls as P2-T03/P2-T04 land.
+- [ ] P2.5-T03 Add audit/activity stream and operational diagnostics.
 
 ## EPIC P3 — Secure Filesystem
 - [ ] P3-T01 Safe read/stat/list/search primitives.
@@ -74,8 +80,8 @@ Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
 ## EPIC P11 — Deployment
 - [ ] preflight/build/test/package/backup/deploy/health/smoke/rollback/release state machine.
 
-## EPIC P12 — Control Center
-- [ ] professional operations UI over real APIs: Overview, Projects, Brain, Jobs, Tasks, Workflows, Tool Calls, Permissions, Policies, Git, Browser, Previews, Remote, Deployments, Audit, Security, Health, Settings.
+## EPIC P12 — Control Center Completion
+- [ ] complete the professional operations UI over real APIs: Brain, Jobs, Tasks, Workflows, Tool Calls, Git, Browser, Previews, Remote, Deployments, Audit, Security and remaining Settings; foundation Overview/Projects/MCP shell is already delivered in P2.5.
 
 ## EPIC P13 — Security hardening
 - [ ] threat-model test suite: traversal, symlink escape, injection, prompt/repo abuse, secrets, SSRF/browser abuse, cross-project/tenant, auth bypass, replay, DoS/output limits, archive/supply-chain.

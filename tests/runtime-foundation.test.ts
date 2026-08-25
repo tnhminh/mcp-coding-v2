@@ -23,7 +23,12 @@ async function reservePort(): Promise<number> {
 
 describe('runtime foundation', () => {
   test('configuration has secure loopback defaults and validates unsafe values', () => {
-    expect(loadConfig({})).toEqual({ host: '127.0.0.1', port: 7317, logLevel: 'info' });
+    expect(loadConfig({})).toEqual({
+      host: '127.0.0.1',
+      port: 7317,
+      logLevel: 'info',
+      databasePath: '.runtime/mcp-coding-v2.sqlite',
+    });
     expect(() => loadConfig({ MCP_HOST: '0.0.0.0' })).toThrowError(AppError);
     expect(() => loadConfig({ MCP_PORT: '70000' })).toThrowError(AppError);
     expect(() => loadConfig({ LOG_LEVEL: 'verbose' })).toThrowError(AppError);
@@ -65,7 +70,10 @@ describe('runtime foundation', () => {
   test('HTTP runtime starts, serves health, and closes idempotently', async () => {
     const port = await reservePort();
     const logger = new JsonLogger('error', () => undefined);
-    const runtime = await startHttpRuntime({ host: '127.0.0.1', port, logLevel: 'error' }, logger);
+    const runtime = await startHttpRuntime(
+      { host: '127.0.0.1', port, logLevel: 'error', databasePath: ':memory:' },
+      logger,
+    );
 
     const response = await fetch(`http://127.0.0.1:${port}/health/ready`);
     expect(response.status).toBe(200);

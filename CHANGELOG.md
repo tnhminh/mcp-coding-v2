@@ -20,3 +20,6 @@
 - Raised Node engine floor to 22.13.0 to match the selected SQLite driver and current tooling support floor.
 - Added registry-aware canonical project path resolution with sibling/nested project isolation and duplicate canonical-root rejection.
 - Added traversal, junction/symlink and Windows alternate-stream/device-name/path-normalization adversarial tests.
+- Added the first real Control Center at `/control-center` with a professional operations shell, Overview, Projects, MCP/Tools and Settings.
+- Wired HTTP runtime to persistent SQLite via `MCP_DATABASE_PATH` and exposed validated localhost-only Project Registry CRUD APIs.
+- Added Control Center integration tests for page/API contracts, project create/update/list/remove and invalid edit validation.
