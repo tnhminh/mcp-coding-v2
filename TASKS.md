@@ -20,8 +20,9 @@ Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
   - Security: reject legacy era by default for initial modern-only baseline.
 - [x] P1-T04 Implement localhost Streamable HTTP entrypoint and live/ready endpoints.
   - Security: loopback bind + Host/Origin validation.
-- [~] P1-T05 Add MCP protocol contract tests for initialize/tools/list/tools/call over stdio and HTTP.
-- [ ] P1-T06 Structured error model, configuration schema, JSON logger, graceful lifecycle tests.
+- [x] P1-T05 Add MCP protocol contract tests for initialize/tools/list/tools/call over stdio and HTTP.
+  - Evidence: official v2 client pinned to 2026-07-28 passes stdio + HTTP negotiation, tools/list, tools/call, unknown-tool and strict-input validation contracts.
+- [~] P1-T06 Structured error model, configuration schema, JSON logger, graceful lifecycle tests.
 
 ## EPIC P2 — Project Registry / Permissions / Rules
 - [ ] P2-T01 Project aggregate + repository interface + SQLite migration.

@@ -8,3 +8,6 @@
 - Added `system_health`, stdio and localhost Streamable HTTP entrypoints.
 - Fixed initial lint failures and achieved a passing `npm run check`.
 - Added Phase 0/production planning and handoff documentation baseline.
+- Added official MCP v2 client contract dependency and real stdio/HTTP protocol tests.
+- Fixed HTTP modern-era negotiation by replacing direct transport wiring with SDK v2 createMcpHandler + Node adapter.
+- Enforced strict empty input schema for system_health and verified invalid-argument behavior.

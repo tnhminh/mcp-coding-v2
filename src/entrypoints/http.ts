@@ -1,9 +1,6 @@
 ﻿import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import {
-  localhostHostValidation,
-  localhostOriginValidation,
-  NodeStreamableHTTPServerTransport,
-} from '@modelcontextprotocol/node';
+import { localhostHostValidation, localhostOriginValidation, toNodeHandler } from '@modelcontextprotocol/node';
+import { createMcpHandler } from '@modelcontextprotocol/server';
 import { createMcpServer } from '../app/create-mcp-server.js';
 import { HealthService } from '../app/health-service.js';
 
@@ -12,6 +9,13 @@ const port = Number(process.env.MCP_PORT ?? '7317');
 const health = new HealthService();
 const validateHost = localhostHostValidation();
 const validateOrigin = localhostOriginValidation();
+const mcpHandler = createMcpHandler(() => createMcpServer(), {
+  legacy: 'reject',
+  onerror: (error) => console.error('[mcp-coding-v2][mcp]', error),
+});
+const handleMcp = toNodeHandler(mcpHandler, {
+  onerror: (error) => console.error('[mcp-coding-v2][http-adapter]', error),
+});
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.url === '/health/live' || req.url === '/health/ready') {
@@ -27,11 +31,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   }
 
   if (!validateHost(req, res) || !validateOrigin(req, res)) return;
-
-  const mcp = createMcpServer();
-  const transport = new NodeStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-  await mcp.connect(transport);
-  await transport.handleRequest(req, res);
+  await handleMcp(req as unknown as Parameters<typeof handleMcp>[0], res);
 }
 
 const httpServer = createServer((req, res) => {
@@ -47,5 +47,9 @@ httpServer.listen(port, host, () => {
 });
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-  process.once(signal, () => httpServer.close(() => process.exit(0)));
+  process.once(signal, () => {
+    httpServer.close(() => {
+      void mcpHandler.close().finally(() => process.exit(0));
+    });
+  });
 }

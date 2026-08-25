@@ -6,8 +6,8 @@ Status: **FAIL — INCOMPLETE** (2026-08-25)
 |---|---|---|
 | MCP v2 dependency baseline | PASS | official v2 packages installed |
 | stdio bootstrap | PASS | source builds |
-| Streamable HTTP bootstrap | PASS | source builds; runtime smoke still being expanded |
-| schema/invalid-request contract suite | FAIL | P1-T05 pending |
+| Streamable HTTP bootstrap | PASS | 2026-07-28 negotiation + tools/list/tools/call contract test passes |
+| schema/invalid-request contract suite | PASS | unknown tool => ProtocolError -32602; strict tool input => isError validation result over stdio + HTTP |
 | authentication/RBAC | FAIL | not implemented |
 | project/path isolation | FAIL | not implemented |
 | command policies | FAIL | not implemented |

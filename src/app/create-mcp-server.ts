@@ -14,7 +14,7 @@ export function createMcpServer(): McpServer {
     {
       title: 'System health',
       description: 'Return a minimal non-sensitive health snapshot for the MCP control plane.',
-      inputSchema: z.object({}),
+      inputSchema: z.object({}).strict(),
       outputSchema: z.object({
         service: z.string(),
         version: z.string(),
@@ -34,4 +34,3 @@ export function createMcpServer(): McpServer {
 
   return server;
 }
-
