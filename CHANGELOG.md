@@ -59,3 +59,18 @@
 - Phase 1 Bridge Finalization: added native project-scoped local Git runtime, runtime-owned managed process lifecycle, Git/Processes Control Center surfaces, shutdown cleanup and a machine-verifiable Phase 1 capability gate. Full gate: 25 files / 101 tests PASS.
 - Extended permission-session lifetime controls: finite TTL up to 150 days plus explicit no-expiry mode for trusted local agents; revoke and deny-policy semantics remain unchanged. Full gate: 25 files / 102 tests PASS.
 - Hardened AI handoff documentation: added root `AGENTS.md` and `VIBECODE_WORKFLOW.md`; refreshed README/architecture/status/tasks/handoff/localhost guidance; documented source-of-truth precedence, Definition of Done, Phase 1-4 mapping and current Phase 2 Skill Runtime resume path.
+
+## 2026-08-27
+- Completed Phase 1.5 Vibecode Hardening to reduce false negatives and real-project friction without turning the MCP bridge into an autonomous agent.
+- Hardened structured process execution: successful commands remain successful when captured output is truncated; safe toolchain/public frontend environment variables may pass through explicitly; `CI=1` is no longer forced; discovery covers common `test:*` / `build:*` and managed web/frontend/backend/server/api/app/local process variants with broader bounded timeouts.
+- Added explicit scan truncation metadata, adaptive/stopword-aware context budgets and automatic stale Project Brain refresh before context/graph queries.
+- Added bounded `tsconfig.json` `baseUrl`/`paths` alias import resolution and explicit structural TS/JS vs lexical-only analysis coverage for other languages.
+- Hardened guidance scoping so nested AGENTS instructions activate only for matching target paths while discovery remains bounded and reports omissions/truncation.
+- Added `read_file_range` and `replace_file_lines` for authorized text files up to 16 MiB, plus same-file sequential SHA-guarded batch/apply/coding-cycle patches.
+- Hardened verification semantics: absent verifier tasks become explicit `deferred`; unchanged pre-existing source failures may keep a no-new-regression patch as `baseline_accepted` but remain `verified=false`; AI Jobs cannot treat a red baseline as DONE.
+- Improved permission-session auto-resolution using deterministic same-principal dominant capability envelopes while keeping incomparable/different-principal sessions ambiguous and deny-policy override intact.
+- Added read-only Git status/diff/log/branch scope for registered monorepo subprojects while keeping Git writes repository-root only.
+- Expanded preview MIME/browser discovery and added deny-by-default page egress with optional explicit trusted-local `MCP_BROWSER_ALLOWED_ORIGINS`.
+- Added multi-toolchain readiness recommendations for Go/Cargo/Python without automatically forcing unsafe global Python installs.
+- Added read-only Control Center project access snapshots so startup/selectors avoid unauthorized AI Job/Preview probes; protected backend APIs remain fail-closed.
+- Final verification: `npm run check` PASS with 25 test files / 113 tests; production build PASS; `npm audit --omit=dev` 0 vulnerabilities; `git diff --check` PASS. Compiled localhost live/ready/control-center returned HTTP 200, Control Center exposed 64 tools, and fallback Playwright + Edge review reported 0 page errors, 0 console errors and 0 HTTP >=400 responses.

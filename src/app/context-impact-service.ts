@@ -53,8 +53,15 @@ function addScore(scores: Map<string, ScoreEntry>, relativePath: string, score: 
   scores.set(key, entry);
 }
 
+const CONTEXT_STOP_WORDS = new Set([
+  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'bug', 'by', 'change', 'code', 'do', 'fix', 'for', 'from', 'in', 'into',
+  'is', 'it', 'of', 'on', 'or', 'please', 'the', 'this', 'to', 'update', 'with', 'when', 'where', 'why',
+]);
+
 function tokensFor(query: string): string[] {
-  return [...new Set(query.toLowerCase().split(/[^a-z0-9_$.-]+/u).filter((token) => token.length >= 2))].slice(0, 5);
+  const raw = [...new Set(query.toLowerCase().split(/[^a-z0-9_$@/.-]+/u).filter((token) => token.length >= 2))];
+  const meaningful = raw.filter((token) => !CONTEXT_STOP_WORDS.has(token));
+  return (meaningful.length > 0 ? meaningful : raw).slice(0, 12);
 }
 
 function snippetAround(content: string, lineHints: readonly number[], maxChars: number): string {
@@ -124,8 +131,8 @@ export class ContextImpactService {
       for (const match of matches) addScore(scores, match.path, literal === query ? 16 : 5, `text hit '${literal}'`, match.line);
     }
 
-    const maxFiles = Math.min(Math.max(request.maxFiles ?? 8, 1), 12);
-    const maxChars = Math.min(Math.max(request.maxChars ?? 12_000, 2_000), 24_000);
+    const maxFiles = Math.min(Math.max(request.maxFiles ?? 12, 1), 40);
+    const maxChars = Math.min(Math.max(request.maxChars ?? 24_000, 2_000), 120_000);
     const ranked = [...scores.entries()].sort((a, b) => b[1].score - a[1].score || a[0].localeCompare(b[0]));
     const items: ContextItem[] = [];
     let totalChars = 0;
@@ -136,7 +143,7 @@ export class ContextImpactService {
       try {
         const file = await this.filesystem.readTextFile({ ...request, path: relativePath });
         const remaining = maxChars - totalChars;
-        const snippet = snippetAround(file.content, score.lineHints, Math.min(remaining, 3_500));
+        const snippet = snippetAround(file.content, score.lineHints, Math.min(remaining, 8_000));
         if (!snippet) continue;
         items.push({ path: normalized(file.path), score: score.score, reasons: [...score.reasons], sha256: file.sha256, snippet });
         totalChars += snippet.length;

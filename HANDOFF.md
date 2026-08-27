@@ -5,12 +5,12 @@
 - Product state: **IN DEVELOPMENT / not production ready**.
 - Phase 1 Bridge: **verified complete**.
 - Active product phase: **Phase 2 — Skill Runtime V1**.
-- Last committed Phase 1 checkpoint: `1628b70` (`feat: complete phase 1 vibecode bridge`).
-- Latest verified full gate recorded in project docs: **25 test files / 102 tests PASS plus lint, strict typecheck and production build**.
-- Documentation/handoff hardening verification on 2026-08-27: `npm run check` PASS (25 files / 102 tests, lint/typecheck/build PASS) and `git diff --check` PASS.
-- Current working tree contains in-progress permission-session lifetime changes (150-day/no-expiry support) plus AI-handoff documentation hardening; preserve them unless intentionally superseding the same work.
+- Last committed repository checkpoint: `069fa5f` (`docs: harden AI handoff and permission session lifetime`).
+- Latest verified full gate: **25 test files / 113 tests PASS plus lint, strict typecheck and production build**; `npm audit --omit=dev` = 0 vulnerabilities; `git diff --check` PASS.
+- Phase 1.5 Vibecode Hardening verification on 2026-08-27: `npm run check` PASS (25 files / 113 tests, lint/typecheck/build PASS); compiled localhost live/ready/control-center HTTP 200; Control Center reports 64 tools; fallback Playwright + Edge review produced 0 page errors, 0 console errors and 0 HTTP >=400 responses.
+- Current working tree contains the completed-but-uncommitted **Phase 1.5 Vibecode Hardening** source/tests plus synchronized handoff/docs. Preserve this slice unless intentionally superseding it; do not discard it as stale work.
 - AI cold start: read `AGENTS.md` -> this file -> `STATUS.md` -> active `TASKS.md` -> `VIBECODE_WORKFLOW.md`, then inspect Git status/context.
-- Exact next implementation direction after documentation hardening: P16 Skill Runtime V1 manifest/scope normalization, then applicability/activation, requirements, composition/conflicts and verification hooks.
+- Exact next implementation direction after this checkpoint: **P16-T01 Skill Runtime V1 manifest/scope normalization**, then applicability/activation, requirements, composition/conflicts and verification hooks.
 
 ## Purpose
 Build a production-grade AI software-engineering control plane exposed through MCP.
@@ -39,14 +39,14 @@ Strict TypeScript / Node ESM. MCP composition lives in `src/app/create-mcp-serve
 - project-bound permission sessions with fixed capability catalog, immediate revoke, 60s-150d finite TTL and explicit trusted-local no-expiry mode
 - global/project authorization policies with deny override semantics
 - real Permissions/Policies Control Center configuration
-- authorized Secure Filesystem tools over stdio + HTTP: read/stat/list/search/write/append/diff/patch/batch-patch/copy/move/delete
+- authorized Secure Filesystem tools over stdio + HTTP: read/stat/list/search, bounded large-file `read_file_range`, write/append/line-range replacement, diff/patch/batch-patch/copy/move/delete; same-file sequential batch patches share the original SHA guard
 - SHA-256 optimistic concurrency for destructive overwrites and exact patches
 - sensitive-path/private-key/binary/oversize blocking plus delete backups
 - end-to-end CMS permission/policy → MCP filesystem enforcement contract
 - local project/workspace discovery: list_projects, project_info and workspace_bootstrap
 - project skill/instruction discovery: list_skills and read_skill
 - structured test/lint/typecheck/check/build/bench runner with command.run authorization, environment/output/time bounds, redaction and process-tree cleanup
-- apply_and_verify orchestration with default rollback on failed verification; real HTTP MCP E2E PASS
+- `apply_and_verify` with explicit `passed` / `baseline_accepted` / `deferred` / `failed` semantics: new regressions roll back by default; unchanged pre-existing source failures may keep a no-new-regression patch but remain unverified; no verifier is represented as deferred rather than fabricated
 - structured dependency/install/codegen command recipes through the same bounded process runner; no arbitrary caller shell surface
 - coding_cycle bounded IMPLEMENT → TEST → REVIEW/FIX evidence orchestration
 - Auto Task Discovery + Verification Router V2: workspace bootstrap auto-discovers task/preview profiles and publishes fast/release plans. Safe package aliases and Rust/Go/Python/Maven/Gradle/.NET conventions are recognized; static `index.html` projects receive built-in `check` integrity verification. Unavailable task IDs still fail as `VERIFICATION_UNAVAILABLE` before mutation/job-state advance.
@@ -54,9 +54,9 @@ Strict TypeScript / Node ESM. MCP composition lives in `src/app/create-mcp-serve
 - Project Readiness P4.6: `project_readiness` + `prepare_workspace` classify/repair missing dependency artifacts before coding, capture baseline task evidence, expose `failureKind`, and avoid adding legacy static verification when framework/package verifiers already exist.
 - persistent SQLite AI Jobs with explicit transitions, CAS concurrency control, bounded evidence, restart recovery and no persisted permission-session IDs
 - loopback static/recognized dev preview sessions with sensitive-path blocking, health/start/stop and process-tree cleanup
-- browser_review using local Edge/Chrome with same-origin HTTP/WebSocket isolation and DOM/console/network/action/screenshot evidence
+- `browser_review` using local Edge/Chrome with DOM/console/network/action/screenshot evidence; external page egress is denied by default, with only explicit trusted-local origins allowed through `MCP_BROWSER_ALLOWED_ORIGINS`
 - read-only MCP resource `mcp://server/tool-catalog`; resources/list/read contract PASS for modern + legacy Streamable HTTP clients
-- live compiled localhost restart/smoke PASS on port 7317: health live/ready ok, Control Center HTTP 200, 45 MCP tools visible, `kpi2` static preview/browser review/stop PASS and persistent AI Job create/status/cancel PASS without invoking a source-mutating coding cycle
+- latest compiled localhost restart/smoke PASS on port 7317: health live/ready + Control Center HTTP 200, **64 MCP tools visible**, and live Control Center fallback browser review clean with zero page/console/HTTP errors
 - external ChatCode browser engine remains unavailable (`operational=false`) when retried after deploys; fallback Playwright + installed Edge performs live Control Center review automatically
 - real AI Jobs + Workflow Runs Control Center panels backed by persistent SQLite job APIs
 - real Browser / Preview Control Center panel with profile discovery, runtime preview list/start/status/stop and Browser Review DOM/network/screenshot evidence
@@ -65,13 +65,13 @@ Strict TypeScript / Node ESM. MCP composition lives in `src/app/create-mcp-serve
 - persistent Project Brain with bounded file/language/test/config metadata, TS/JS AST declarations/imports/references and incremental SHA reuse
 - SQLite Brain snapshots survive runtime recreation and corrupted snapshots fail closed
 - brain_build, brain_status, find_symbol, symbol_references, context_bundle and impact_analysis over MCP
-- bounded weighted lexical+graph context retrieval and declaration/reference/importer/related-test impact analysis
+- bounded weighted lexical+graph context retrieval with stopword filtering/adaptive budgets, Brain stale-snapshot refresh, TS/JS `tsconfig` alias resolution and explicit structural-vs-lexical-only analysis coverage
 
 ## Current task
-Phase 2 Skill Runtime V1 - turn discovered AGENTS/SKILL/rule files into an executable, scoped skill runtime before building the integrated Coding Harness. The repository now includes root `AGENTS.md` and `VIBECODE_WORKFLOW.md` so a cold-start AI can resume without conversation history.
+**Phase 1.5 Vibecode Hardening is implementation-complete and verified in the current uncommitted working tree.** Documentation/handoff is synchronized to that evidence. Resume implementation at **Phase 2 / P16-T01 Skill Runtime V1 manifest + scope normalization**; the repository includes root `AGENTS.md` and `VIBECODE_WORKFLOW.md` so a cold-start AI can continue without conversation history.
 
 ## Next task
-Skill Runtime V1: normalize skill manifests, activation/applicability rules, scope inheritance, tool requirements, composition/conflict behavior and verification hooks. Coding Harness follows after this phase; remote/deploy remain deferred.
+P16-T01 first: introduce typed/bounded Skill Runtime descriptors over current discovery without weakening authorization. Then P16-T02..T06: activation/applicability + scope inheritance, required tool/capability behavior, deterministic composition/conflict precedence, verification hooks/lifecycle integration and MCP/Control Center evidence. Coding Harness follows after this phase; remote/deploy remain deferred.
 
 ## Run/test/build
 `npm install`; `npm run dev:stdio`; `npm run dev:http`; `npm run check`.

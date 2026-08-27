@@ -37,7 +37,7 @@ describe('Project Brain + context + impact', () => {
       '',
     ].join('\n'), 'utf8');
     await writeFile(path.join(root, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }), 'utf8');
-    await writeFile(path.join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { strict: true } }), 'utf8');
+    await writeFile(path.join(root, 'tsconfig.json'), JSON.stringify({ compilerOptions: { strict: true, baseUrl: '.', paths: { '@/*': ['src/*'] } } }), 'utf8');
     await writeFile(path.join(root, 'README.md'), '# Fixture\n', 'utf8');
 
     services = createRuntimeServices(db.database, ':memory:');
@@ -70,6 +70,8 @@ describe('Project Brain + context + impact', () => {
     expect(summary.counts.symbols).toBeGreaterThanOrEqual(3);
     expect(summary.counts.tests).toBe(1);
     expect(summary.counts.configs).toBeGreaterThanOrEqual(2);
+    expect(summary.analysisCoverage.structural).toContain('typescript');
+    expect(summary.analysisCoverage.lexicalOnly).toContain('json');
 
     const index = await services.brain.index(auth());
     expect(index.symbols).toEqual(expect.arrayContaining([
@@ -79,6 +81,12 @@ describe('Project Brain + context + impact', () => {
     expect(index.imports).toEqual(expect.arrayContaining([
       expect.objectContaining({ fromPath: 'src/service.ts', specifier: './math', resolvedPath: 'src/math.ts' }),
       expect.objectContaining({ fromPath: 'tests/service.test.ts', specifier: '../src/service', resolvedPath: 'src/service.ts' }),
+    ]));
+    await writeFile(path.join(root, 'src', 'alias-consumer.ts'), "import { add } from '@/math';\nexport const aliased = add(5, 6);\n", 'utf8');
+    await services.brain.build(auth());
+    const aliasIndex = await services.brain.index(auth());
+    expect(aliasIndex.imports).toEqual(expect.arrayContaining([
+      expect.objectContaining({ fromPath: 'src/alias-consumer.ts', specifier: '@/math', resolvedPath: 'src/math.ts' }),
     ]));
     expect(index.tests).toContain('tests/service.test.ts');
     expect(index.configs).toEqual(expect.arrayContaining(['package.json', 'tsconfig.json']));
@@ -114,6 +122,26 @@ describe('Project Brain + context + impact', () => {
     expect(context.totalChars).toBeLessThanOrEqual(6000);
     expect(context.items.map((item) => item.path)).toEqual(expect.arrayContaining(['src/math.ts', 'src/service.ts']));
     expect(context.items.find((item) => item.path === 'src/math.ts')?.reasons.join(' ')).toContain('symbol');
+
+    const stopwordHeavy = await services.contextImpact.contextBundle({
+      ...auth(),
+      query: 'please fix the bug in user compute permission service',
+      maxFiles: 12,
+      maxChars: 24_000,
+    });
+    expect(stopwordHeavy.items.map((item) => item.path)).toContain('src/service.ts');
+  });
+
+  test('refreshes stale Brain content before context queries', async () => {
+    await services.brain.build(auth());
+    await new Promise((resolve) => setTimeout(resolve, 1600));
+    await writeFile(path.join(root, 'src', 'service.ts'), [
+      "import { add } from './math';",
+      'export function renamedCompute() { return add(4, 5); }',
+      '',
+    ].join('\n'), 'utf8');
+    const symbols = await services.brain.findSymbols({ ...auth(), query: 'renamedCompute' });
+    expect(symbols[0]).toMatchObject({ name: 'renamedCompute', path: 'src/service.ts' });
   });
 
   test('impact analysis follows declaration to importer and related test', async () => {

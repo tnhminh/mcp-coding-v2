@@ -18,9 +18,11 @@ import { ProjectPathResolverFactory } from './project-path-resolver-factory.js';
 import type { ProjectPathResolver, ResolvedProjectPath } from '../infra/filesystem/project-path-resolver.js';
 
 const MAX_TEXT_FILE_BYTES = 1024 * 1024;
-const MAX_LIST_ENTRIES = 500;
-const MAX_LIST_DEPTH = 8;
-const MAX_SEARCH_FILES = 1000;
+const MAX_LARGE_TEXT_FILE_BYTES = 16 * 1024 * 1024;
+const MAX_RANGE_OUTPUT_BYTES = 512 * 1024;
+const MAX_LIST_ENTRIES = 5000;
+const MAX_LIST_DEPTH = 12;
+const MAX_SEARCH_FILES = 10_000;
 const MAX_SEARCH_RESULTS = 100;
 const SKIP_DIRECTORIES = new Set(['.git', 'node_modules', 'dist', 'coverage', '.runtime']);
 const SENSITIVE_BASENAMES = new Set([
@@ -42,6 +44,17 @@ export interface TextFileResult {
   sha256: string;
 }
 
+export interface TextRangeResult {
+  path: string;
+  content: string;
+  bytes: number;
+  sha256: string;
+  startLine: number;
+  endLine: number;
+  totalLines: number;
+  truncated: boolean;
+}
+
 export interface PathStatResult {
   path: string;
   type: 'file' | 'directory' | 'symlink' | 'other';
@@ -55,11 +68,22 @@ export interface ListedEntry {
   bytes: number | null;
 }
 
+export interface ListFilesResult {
+  entries: ListedEntry[];
+  truncated: boolean;
+}
+
 export interface SearchMatch {
   path: string;
   line: number;
   column: number;
   preview: string;
+}
+
+export interface SearchTextResult {
+  matches: SearchMatch[];
+  inspectedFiles: number;
+  truncated: boolean;
 }
 
 export interface WriteResult {
@@ -135,9 +159,9 @@ function hasPrivateKeyMaterial(content: string): boolean {
   return /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/u.test(content);
 }
 
-function assertTextBuffer(buffer: Buffer): string {
-  if (buffer.length > MAX_TEXT_FILE_BYTES) {
-    throw new AppError({ code: 'FILE_TOO_LARGE', message: 'Text file exceeds the 1 MiB coding-tool limit.', httpStatus: 413, expose: true });
+function assertTextBufferLimit(buffer: Buffer, maxBytes: number, label: string): string {
+  if (buffer.length > maxBytes) {
+    throw new AppError({ code: 'FILE_TOO_LARGE', message: `Text file exceeds the ${label} coding-tool limit.`, httpStatus: 413, expose: true });
   }
   if (buffer.includes(0)) {
     throw new AppError({ code: 'BINARY_FILE', message: 'Binary files are not exposed as text.', httpStatus: 415, expose: true });
@@ -149,9 +173,13 @@ function assertTextBuffer(buffer: Buffer): string {
   return content;
 }
 
-function assertTextSize(content: string): void {
-  if (byteLength(content) > MAX_TEXT_FILE_BYTES) {
-    throw new AppError({ code: 'FILE_TOO_LARGE', message: 'Text content exceeds the 1 MiB coding-tool limit.', httpStatus: 413, expose: true });
+function assertTextBuffer(buffer: Buffer): string {
+  return assertTextBufferLimit(buffer, MAX_TEXT_FILE_BYTES, '1 MiB');
+}
+
+function assertTextSizeLimit(content: string, maxBytes: number, label: string): void {
+  if (byteLength(content) > maxBytes) {
+    throw new AppError({ code: 'FILE_TOO_LARGE', message: `Text content exceeds the ${label} coding-tool limit.`, httpStatus: 413, expose: true });
   }
   if (content.includes('\0')) {
     throw new AppError({ code: 'BINARY_FILE', message: 'NUL bytes are not allowed in text writes.', httpStatus: 415, expose: true });
@@ -161,11 +189,25 @@ function assertTextSize(content: string): void {
   }
 }
 
+function assertTextSize(content: string): void {
+  assertTextSizeLimit(content, MAX_TEXT_FILE_BYTES, '1 MiB');
+}
+
 function entryType(entry: Dirent): ListedEntry['type'] {
   if (entry.isFile()) return 'file';
   if (entry.isDirectory()) return 'directory';
   if (entry.isSymbolicLink()) return 'symlink';
   return 'other';
+}
+
+async function existingTextFileWithLimit(resolver: ProjectPathResolver, requestedPath: string, maxBytes: number, label: string): Promise<{ resolved: ResolvedProjectPath; buffer: Buffer; content: string }> {
+  const resolved = await resolver.resolveExisting(requestedPath);
+  assertSafeContentPath(resolved.relativePath);
+  const fileStat = await stat(resolved.absolutePath);
+  if (!fileStat.isFile()) throw new AppError({ code: 'PATH_INVALID', message: 'Path must refer to a regular file.', httpStatus: 400, expose: true });
+  if (fileStat.size > maxBytes) throw new AppError({ code: 'FILE_TOO_LARGE', message: `Text file exceeds the ${label} coding-tool limit.`, httpStatus: 413, expose: true });
+  const buffer = await readFile(resolved.absolutePath);
+  return { resolved, buffer, content: assertTextBufferLimit(buffer, maxBytes, label) };
 }
 
 async function existingTextFile(resolver: ProjectPathResolver, requestedPath: string): Promise<{ resolved: ResolvedProjectPath; buffer: Buffer; content: string }> {
@@ -201,6 +243,63 @@ export class SecureFilesystemService {
     };
   }
 
+  async readTextRange(request: AuthorizedProjectRequest & { path: string; startLine?: number; maxLines?: number; maxBytes?: number }): Promise<TextRangeResult> {
+    await this.authorization.authorize({ ...request, capability: 'filesystem.read' });
+    const resolver = await this.paths.forProject(request.projectId);
+    const file = await existingTextFileWithLimit(resolver, request.path, MAX_LARGE_TEXT_FILE_BYTES, '16 MiB');
+    const lines = file.content.split(/\r?\n/u);
+    const startLine = Math.min(Math.max(request.startLine ?? 1, 1), Math.max(lines.length, 1));
+    const maxLines = Math.min(Math.max(request.maxLines ?? 400, 1), 2000);
+    const maxBytes = Math.min(Math.max(request.maxBytes ?? 128 * 1024, 1024), MAX_RANGE_OUTPUT_BYTES);
+    const selected: string[] = [];
+    let bytes = 0;
+    let endLine = startLine - 1;
+    for (let index = startLine - 1; index < lines.length && selected.length < maxLines; index += 1) {
+      const line = lines[index] ?? '';
+      const addition = (selected.length > 0 ? '\n' : '') + line;
+      const additionBytes = byteLength(addition);
+      if (selected.length > 0 && bytes + additionBytes > maxBytes) break;
+      if (selected.length === 0 && additionBytes > maxBytes) {
+        selected.push(Buffer.from(line, 'utf8').subarray(0, maxBytes).toString('utf8'));
+        bytes = byteLength(selected[0] ?? '');
+        endLine = index + 1;
+        break;
+      }
+      selected.push(line);
+      bytes += additionBytes;
+      endLine = index + 1;
+    }
+    return {
+      path: file.resolved.relativePath,
+      content: selected.join('\n'),
+      bytes,
+      sha256: sha256(file.buffer),
+      startLine,
+      endLine,
+      totalLines: lines.length,
+      truncated: endLine < lines.length,
+    };
+  }
+
+  async replaceTextLines(request: AuthorizedProjectRequest & { path: string; startLine: number; endLine: number; replacement: string; expectedSha256: string }): Promise<WriteResult> {
+    await this.authorization.authorize({ ...request, capability: 'filesystem.write' });
+    assertTextSize(request.replacement);
+    const resolver = await this.paths.forProject(request.projectId);
+    const current = await existingTextFileWithLimit(resolver, request.path, MAX_LARGE_TEXT_FILE_BYTES, '16 MiB');
+    this.assertExpectedSha(current, request.expectedSha256);
+    const starts = [0];
+    for (let index = 0; index < current.content.length; index += 1) if (current.content[index] === '\n') starts.push(index + 1);
+    const totalLines = starts.length;
+    if (request.startLine < 1 || request.endLine < request.startLine || request.endLine > totalLines) {
+      throw new AppError({ code: 'VALIDATION_ERROR', message: `Line range must be within 1..${totalLines}.`, httpStatus: 400, expose: true });
+    }
+    const startOffset = starts[request.startLine - 1] ?? 0;
+    const endOffset = starts[request.endLine] ?? current.content.length;
+    const next = current.content.slice(0, startOffset) + request.replacement + current.content.slice(endOffset);
+    assertTextSizeLimit(next, MAX_LARGE_TEXT_FILE_BYTES, '16 MiB');
+    return this.writeAuthorized(resolver, request.path, next, current);
+  }
+
   async statPath(request: AuthorizedProjectRequest & { path: string }): Promise<PathStatResult> {
     await this.authorization.authorize({ ...request, capability: 'filesystem.read' });
     const resolver = await this.paths.forProject(request.projectId);
@@ -216,6 +315,10 @@ export class SecureFilesystemService {
   }
 
   async listFiles(request: AuthorizedProjectRequest & { path?: string; depth?: number; maxEntries?: number }): Promise<ListedEntry[]> {
+    return (await this.listFilesDetailed(request)).entries;
+  }
+
+  async listFilesDetailed(request: AuthorizedProjectRequest & { path?: string; depth?: number; maxEntries?: number }): Promise<ListFilesResult> {
     await this.authorization.authorize({ ...request, capability: 'filesystem.read' });
     const resolver = await this.paths.forProject(request.projectId);
     const root = await resolver.resolveExisting(request.path ?? '.');
@@ -227,14 +330,17 @@ export class SecureFilesystemService {
     const maxEntries = Math.min(Math.max(request.maxEntries ?? 200, 1), MAX_LIST_ENTRIES);
     const results: ListedEntry[] = [];
     const queue: Array<{ absolute: string; depth: number }> = [{ absolute: root.absolutePath, depth: 0 }];
+    let truncated = false;
 
     while (queue.length > 0 && results.length < maxEntries) {
       const current = queue.shift();
       if (!current) break;
       const entries = await readdir(current.absolute, { withFileTypes: true });
       entries.sort((a, b) => a.name.localeCompare(b.name));
-      for (const entry of entries) {
-        if (results.length >= maxEntries) break;
+      for (let entryIndex = 0; entryIndex < entries.length; entryIndex += 1) {
+        if (results.length >= maxEntries) { truncated = true; break; }
+        const entry = entries[entryIndex];
+        if (!entry) continue;
         if (SKIP_DIRECTORIES.has(entry.name) && entry.isDirectory()) continue;
         const candidateAbsolute = path.join(current.absolute, entry.name);
         const candidateInput = path.relative(resolver.canonicalRoot, candidateAbsolute);
@@ -252,12 +358,18 @@ export class SecureFilesystemService {
         const info = await lstat(resolved.absolutePath);
         results.push({ path: resolved.relativePath, type: entryType(entry), bytes: info.isFile() ? info.size : null });
         if (entry.isDirectory() && current.depth < maxDepth) queue.push({ absolute: resolved.absolutePath, depth: current.depth + 1 });
+        if (results.length >= maxEntries && entryIndex < entries.length - 1) truncated = true;
       }
     }
-    return results;
+    if (queue.length > 0) truncated = true;
+    return { entries: results, truncated };
   }
 
   async searchText(request: AuthorizedProjectRequest & { query: string; path?: string; maxResults?: number }): Promise<SearchMatch[]> {
+    return (await this.searchTextDetailed(request)).matches;
+  }
+
+  async searchTextDetailed(request: AuthorizedProjectRequest & { query: string; path?: string; maxResults?: number }): Promise<SearchTextResult> {
     await this.authorization.authorize({ ...request, capability: 'filesystem.read' });
     const query = request.query.trim();
     if (!query) throw new AppError({ code: 'VALIDATION_ERROR', message: 'Search query is required.', httpStatus: 400, expose: true });
@@ -276,6 +388,7 @@ export class SecureFilesystemService {
       const directory = queue.shift();
       if (!directory) break;
       const entries = await readdir(directory, { withFileTypes: true });
+      entries.sort((a, b) => a.name.localeCompare(b.name));
       for (const entry of entries) {
         if (matches.length >= maxResults || inspectedFiles >= MAX_SEARCH_FILES) break;
         if (entry.isDirectory()) {
@@ -300,7 +413,11 @@ export class SecureFilesystemService {
         }
       }
     }
-    return matches;
+    return {
+      matches,
+      inspectedFiles,
+      truncated: queue.length > 0 || inspectedFiles >= MAX_SEARCH_FILES || matches.length >= maxResults,
+    };
   }
 
   async writeTextFile(request: AuthorizedProjectRequest & { path: string; content: string; expectedSha256?: string | null }): Promise<WriteResult> {
@@ -370,20 +487,37 @@ export class SecureFilesystemService {
       throw new AppError({ code: 'VALIDATION_ERROR', message: 'Batch patch requires 1 to 20 changes.', httpStatus: 400, expose: true });
     }
     const resolver = await this.paths.forProject(request.projectId);
-    const originals = new Map<string, { content: string; sha256: string }>();
+    const grouped = new Map<string, BatchPatchChange[]>();
     for (const change of request.changes) {
-      if (originals.has(change.path)) throw new AppError({ code: 'VALIDATION_ERROR', message: 'Batch patch cannot target the same path more than once.', httpStatus: 400, expose: true });
-      const current = await this.readCurrentForWrite(resolver, change.path);
+      const bucket = grouped.get(change.path) ?? [];
+      bucket.push(change);
+      grouped.set(change.path, bucket);
+    }
+
+    const originals = new Map<string, { content: string; sha256: string }>();
+    const proposed = new Map<string, string>();
+    for (const [patchPath, changes] of grouped) {
+      const current = await this.readCurrentForWrite(resolver, patchPath);
       if (!current) throw new AppError({ code: 'PATH_NOT_FOUND', message: 'Batch patch target does not exist.', httpStatus: 404, expose: true });
-      this.assertExpectedSha(current, change.expectedSha256);
-      originals.set(change.path, { content: current.content, sha256: sha256(current.buffer) });
-      this.computePatchedContent(current.content, change.search, change.replacement, change.expectedCount);
+      const originalSha = sha256(current.buffer);
+      let next = current.content;
+      for (const change of changes) {
+        if (change.expectedSha256.toLowerCase() !== originalSha) {
+          throw new AppError({ code: 'SHA_MISMATCH', message: 'All patches for one file must reference its same current SHA-256.', httpStatus: 409, expose: true });
+        }
+        next = this.computePatchedContent(next, change.search, change.replacement, change.expectedCount);
+      }
+      originals.set(patchPath, { content: current.content, sha256: originalSha });
+      proposed.set(patchPath, next);
     }
 
     const applied: WriteResult[] = [];
     try {
-      for (const change of request.changes) {
-        applied.push(await this.applyPatchAuthorized(resolver, change));
+      for (const [patchPath, next] of proposed) {
+        const current = await this.readCurrentForWrite(resolver, patchPath);
+        if (!current) throw new AppError({ code: 'PATH_NOT_FOUND', message: 'Batch patch target disappeared before commit.', httpStatus: 409, expose: true });
+        this.assertExpectedSha(current, originals.get(patchPath)?.sha256);
+        applied.push(await this.writeAuthorized(resolver, patchPath, next, current));
       }
       return { applied };
     } catch (error) {

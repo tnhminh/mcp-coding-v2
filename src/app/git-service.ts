@@ -77,8 +77,10 @@ export class GitService {
   async status(request: { projectId: string; permissionSessionId?: string }): Promise<GitRepositoryStatus> {
     await this.authorization.authorize({ ...request, capability: 'git.read' });
     const resolver = await this.paths.forProject(request.projectId);
-    await this.requireRepository(resolver);
-    const result = await this.git(resolver, ['status', '--porcelain=v2', '--branch', '--untracked-files=all'], 20, MAX_GIT_OUTPUT_BYTES);
+    const repository = await this.requireRepository(resolver, true);
+    const args = ['status', '--porcelain=v2', '--branch', '--untracked-files=all'];
+    if (repository.nested) args.push('--', '.');
+    const result = await this.git(resolver, args, 20, MAX_GIT_OUTPUT_BYTES);
     this.requireSuccess(result, 'Git status failed.');
     return this.parseStatus(resolver, result.stdout);
   }
@@ -91,11 +93,12 @@ export class GitService {
   }): Promise<{ staged: boolean; diff: string; truncated: boolean }> {
     await this.authorization.authorize({ ...request, capability: 'git.read' });
     const resolver = await this.paths.forProject(request.projectId);
-    await this.requireRepository(resolver);
+    const repository = await this.requireRepository(resolver, true);
     const args = ['diff', '--no-ext-diff', '--no-textconv', '--unified=3'];
     if (request.staged) args.push('--cached');
     const paths = await this.pathspecs(resolver, request.paths ?? []);
     if (paths.length > 0) args.push('--', ...paths);
+    else if (repository.nested) args.push('--', '.');
     const result = await this.git(resolver, args, 30, MAX_GIT_OUTPUT_BYTES);
     this.requireSuccess(result, 'Git diff failed.');
     return { staged: request.staged ?? false, diff: result.stdout, truncated: result.outputTruncated };
@@ -108,14 +111,16 @@ export class GitService {
   }): Promise<{ commits: GitCommitSummary[] }> {
     await this.authorization.authorize({ ...request, capability: 'git.read' });
     const resolver = await this.paths.forProject(request.projectId);
-    await this.requireRepository(resolver);
+    const repository = await this.requireRepository(resolver, true);
     const limit = Math.min(Math.max(request.limit ?? 20, 1), 100);
-    const result = await this.git(resolver, [
+    const args = [
       'log',
       '-' + String(limit),
       '--date=iso-strict',
       '--pretty=format:%H%x09%an%x09%ae%x09%ad%x09%s',
-    ], 20, MAX_GIT_OUTPUT_BYTES);
+    ];
+    if (repository.nested) args.push('--', '.');
+    const result = await this.git(resolver, args, 20, MAX_GIT_OUTPUT_BYTES);
     if (!result.success && /does not have any commits yet|your current branch .* does not have any commits/iu.test(result.stderr)) return { commits: [] };
     this.requireSuccess(result, 'Git log failed.');
     return {
@@ -129,7 +134,7 @@ export class GitService {
   async branches(request: { projectId: string; permissionSessionId?: string }): Promise<{ branches: GitBranchSummary[] }> {
     await this.authorization.authorize({ ...request, capability: 'git.read' });
     const resolver = await this.paths.forProject(request.projectId);
-    await this.requireRepository(resolver);
+    await this.requireRepository(resolver, true);
     const result = await this.git(resolver, [
       'for-each-ref',
       '--format=%(refname:short)%09%(HEAD)%09%(objectname)%09%(upstream:short)',
@@ -229,20 +234,26 @@ export class GitService {
     });
   }
 
-  private async requireRepository(resolver: ProjectPathResolver): Promise<void> {
+  private async requireRepository(resolver: ProjectPathResolver, allowAncestorRead = false): Promise<{ repositoryRoot: string; nested: boolean }> {
     const result = await this.git(resolver, ['rev-parse', '--show-toplevel'], 20, 4096);
     this.requireSuccess(result, 'Project is not a Git repository.');
     const top = result.stdout.trim();
     if (!top) throw new AppError({ code: 'CONFLICT', message: 'Project is not a Git repository.', httpStatus: 409, expose: true });
     const canonicalTop = await realpath(path.resolve(top)).catch(() => path.resolve(top));
-    if (this.normalize(canonicalTop) !== this.normalize(resolver.canonicalRoot)) {
-      throw new AppError({
-        code: 'PATH_OUTSIDE_PROJECT',
-        message: 'Git repository root must exactly match the registered project root.',
-        httpStatus: 403,
-        expose: true,
-      });
-    }
+    const repositoryRoot = this.normalize(canonicalTop);
+    const projectRoot = this.normalize(resolver.canonicalRoot);
+    if (repositoryRoot === projectRoot) return { repositoryRoot: canonicalTop, nested: false };
+    const relative = path.relative(canonicalTop, resolver.canonicalRoot);
+    const nested = relative !== '' && !path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`);
+    if (allowAncestorRead && nested) return { repositoryRoot: canonicalTop, nested: true };
+    throw new AppError({
+      code: 'PATH_OUTSIDE_PROJECT',
+      message: nested
+        ? 'Git write operations require the registered project root to match the repository root; read-only Git operations may use nested project scope.'
+        : 'Git repository root is outside the registered project scope.',
+      httpStatus: 403,
+      expose: true,
+    });
   }
 
   private async validateRef(resolver: ProjectPathResolver, name: string): Promise<void> {

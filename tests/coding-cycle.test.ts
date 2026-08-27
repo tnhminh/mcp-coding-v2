@@ -80,6 +80,24 @@ describe('autonomous coding-cycle orchestration', () => {
     expect((await services.filesystem.readTextFile({ ...auth(), path: 'src/value.ts' })).content).toContain("'better'");
   });
 
+  test('accepts multiple exact patches for one file in a coding cycle', async () => {
+    await writeFile(path.join(root, 'src', 'multi.ts'), "export const first = 'a';\nexport const second = 'b';\n", 'utf8');
+    const current = await services.filesystem.readTextFile({ ...auth(), path: 'src/multi.ts' });
+    const result = await services.codingCycle.runCycle({
+      ...auth(),
+      objective: 'Update two independent constants in one source file.',
+      changes: [
+        { op: 'replace', path: 'src/multi.ts', search: "'a'", replacement: "'A'", expectedSha256: current.sha256 },
+        { op: 'replace', path: 'src/multi.ts', search: "'b'", replacement: "'B'", expectedSha256: current.sha256 },
+      ],
+      tasks: [],
+    });
+    expect(result.state).toBe('verification_deferred');
+    expect(result.changedPaths).toEqual(['src/multi.ts']);
+    expect((await services.filesystem.readTextFile({ ...auth(), path: 'src/multi.ts' })).content).toContain("first = 'A'");
+    expect((await services.filesystem.readTextFile({ ...auth(), path: 'src/multi.ts' })).content).toContain("second = 'B'");
+  });
+
   test('failed verification rolls back and returns fix_and_retry evidence', async () => {
     const current = await services.filesystem.readTextFile({ ...auth(), path: 'src/value.ts' });
     const result = await services.codingCycle.runCycle({
@@ -98,6 +116,24 @@ describe('autonomous coding-cycle orchestration', () => {
     expect(result.verification.verification[0]).toMatchObject({ task: 'test', success: false });
     expect(result.beforeReview.context.items.length).toBeGreaterThan(0);
     expect((await services.filesystem.readTextFile({ ...auth(), path: 'src/value.ts' })).content).toContain("'good'");
+  });
+
+  test('supports coding-cycle changes with deferred external/browser verification', async () => {
+    const current = await services.filesystem.readTextFile({ ...auth(), path: 'src/value.ts' });
+    const result = await services.codingCycle.runCycle({
+      ...auth(),
+      objective: 'Make a UI-adjacent source change that has no structured task verifier.',
+      changes: [{ op: 'replace', path: 'src/value.ts', search: "'good'", replacement: "'browser'", expectedSha256: current.sha256 }],
+      tasks: [],
+      iteration: 1,
+      maxIterations: 3,
+    });
+    expect(result.state).toBe('verification_deferred');
+    expect(result.nextAction).toBe('review');
+    expect(result.verification.verificationDeferred).toBe(true);
+    expect(result.afterReview).not.toBeNull();
+    expect(result.agentInstruction).toContain('before declaring DONE');
+    expect((await services.filesystem.readTextFile({ ...auth(), path: 'src/value.ts' })).content).toContain("'browser'");
   });
 
   test('stops automatic retry recommendation at the configured iteration bound', async () => {

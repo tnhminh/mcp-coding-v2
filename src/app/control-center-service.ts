@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { AiJobService } from './ai-job-service.js';
+import type { AuthorizationService, ProjectAccessSnapshot } from './authorization-service.js';
 import type { AuditUsageService } from './audit-usage-service.js';
 import type { AppConfig } from './config.js';
 import type { GitService } from './git-service.js';
@@ -134,6 +135,7 @@ export class ControlCenterService {
 
   constructor(
     private readonly projects: ProjectRepository,
+    private readonly authorization: AuthorizationService,
     private readonly sessions: PermissionSessionRepository,
     private readonly policies: PolicyRepository,
     private readonly aiJobs: AiJobService,
@@ -213,6 +215,10 @@ export class ControlCenterService {
   }
 
   listProjects(): Promise<Project[]> { return this.projects.list(); }
+
+  projectAccess(projectId: string): Promise<ProjectAccessSnapshot> {
+    return this.authorization.inspectAccess({ projectId });
+  }
 
   async createProject(input: unknown): Promise<Project> {
     const parsed = createProjectInputSchema.safeParse(input);

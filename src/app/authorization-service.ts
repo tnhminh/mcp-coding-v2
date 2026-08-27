@@ -38,8 +38,14 @@ export interface ProjectAccessSnapshot {
   };
 }
 
-function envelopeKey(session: PermissionSession): string {
-  return `${session.principalId}\u0000${[...session.capabilities].sort().join(',')}`;
+function dominantSession(candidates: readonly PermissionSession[]): PermissionSession | undefined {
+  if (candidates.length === 0) return undefined;
+  const principals = new Set(candidates.map((session) => session.principalId));
+  if (principals.size !== 1) return undefined;
+  const dominant = candidates.filter((candidate) =>
+    candidates.every((other) => other.capabilities.every((capability) => candidate.capabilities.includes(capability)))
+  );
+  return [...dominant].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
 }
 
 export class AuthorizationService {
@@ -99,8 +105,9 @@ export class AuthorizationService {
       }
       const candidates = activeSessions.filter((session) => session.capabilities.includes(capability));
       if (candidates.length === 0) return { capability, state: 'missing', usable: false, reason: 'No active permission session grants this capability.' };
-      if (new Set(candidates.map(envelopeKey)).size > 1) return { capability, state: 'ambiguous', usable: false, reason: 'Multiple distinct active authorization envelopes grant this capability; an explicit permission session is required.' };
-      return { capability, state: 'granted', usable: true, reason: 'One unambiguous active authorization envelope grants this capability.' };
+      const dominant = dominantSession(candidates);
+      if (!dominant) return { capability, state: 'ambiguous', usable: false, reason: 'Multiple principals or incomparable active authorization envelopes grant this capability; an explicit permission session is required.' };
+      return { capability, state: 'granted', usable: true, reason: 'A deterministic same-principal dominant authorization envelope grants this capability.' };
     };
 
     const capabilities = allCapabilities.map(accessFor);
@@ -118,7 +125,7 @@ export class AuthorizationService {
     } else {
       const codingCandidates = activeSessions.filter((session) => codingRequired.every((capability) => session.capabilities.includes(capability)));
       if (codingCandidates.length === 0) codingState = 'missing';
-      else if (new Set(codingCandidates.map(envelopeKey)).size > 1) codingState = 'ambiguous';
+      else if (!dominantSession(codingCandidates)) codingState = 'ambiguous';
       else {
         codingState = 'granted';
         codingUsable = true;
@@ -179,16 +186,15 @@ export class AuthorizationService {
         });
       }
 
-      const envelopes = new Set(candidates.map(envelopeKey));
-      if (envelopes.size > 1) {
+      session = dominantSession(candidates);
+      if (!session) {
         throw new AppError({
           code: 'PERMISSION_REQUIRED',
-          message: 'Multiple distinct active permission sessions are available; permission_session_id is required.',
+          message: 'Multiple principals or incomparable active permission sessions are available; permission_session_id is required.',
           httpStatus: 403,
           expose: true,
         });
       }
-      session = candidates[0];
     }
 
     if (!session) {

@@ -18,7 +18,7 @@ const packageJsonSchema = z.object({
 const configuredProfileSchema = z.object({
   executable: z.enum(['node', 'npm', 'pnpm', 'yarn', 'bun', 'cargo', 'go', 'python', 'python3', 'pytest', 'uv', 'dotnet', 'mvn', 'mvnw', 'gradle', 'gradlew']),
   args: z.array(z.string().max(4096)).max(64).default([]),
-  timeoutSeconds: z.number().int().min(1).max(600).optional(),
+  timeoutSeconds: z.number().int().min(1).max(3600).optional(),
 }).strict();
 
 const taskConfigSchema = z.object({
@@ -27,19 +27,21 @@ const taskConfigSchema = z.object({
 }).strict();
 
 const DEFAULT_TIMEOUT_SECONDS: Record<TaskKind, number> = {
-  test: 300,
-  lint: 180,
-  typecheck: 180,
-  check: 360,
-  build: 600,
-  bench: 300,
+  test: 900,
+  lint: 300,
+  typecheck: 300,
+  check: 900,
+  build: 1200,
+  bench: 900,
 };
 const DEFAULT_MAX_OUTPUT_BYTES = 256 * 1024;
 const MAX_CONFIG_BYTES = 64 * 1024;
 const MAX_STATIC_HTML_BYTES = 1024 * 1024;
 const SAFE_SCRIPT_NAME = /^[a-z0-9:_-]{1,120}$/iu;
 const STATIC_ASSET_EXTENSIONS = new Set([
-  '.css', '.js', '.mjs', '.cjs', '.json', '.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.woff', '.woff2', '.ttf', '.map', '.webmanifest',
+  '.css', '.js', '.mjs', '.cjs', '.json', '.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.ico',
+  '.woff', '.woff2', '.ttf', '.map', '.webmanifest', '.glb', '.gltf', '.bin', '.wasm',
+  '.mp4', '.webm', '.mov', '.m4v', '.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.pdf',
 ]);
 
 export type TaskProfileSource = 'package.json' | '.mcp/tasks.json' | 'cargo' | 'go' | 'python' | 'maven' | 'gradle' | 'dotnet' | 'builtin-static';
@@ -82,12 +84,12 @@ export interface TaskRunnerOptions {
 type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';
 
 const PACKAGE_SCRIPT_ALIASES: Record<TaskKind, readonly string[]> = {
-  test: ['test', 'test:unit', 'test:ci'],
-  lint: ['lint', 'lint:check'],
-  typecheck: ['typecheck', 'type-check', 'check:types', 'types:check'],
-  check: ['check', 'verify', 'validate'],
-  build: ['build', 'compile', 'bundle'],
-  bench: ['bench', 'benchmark'],
+  test: ['test', 'test:unit', 'test:ci', 'test:integration', 'test:e2e', 'test:all', 'test:backend', 'test:frontend'],
+  lint: ['lint', 'lint:check', 'lint:ci', 'lint:all'],
+  typecheck: ['typecheck', 'type-check', 'check:types', 'types:check', 'typecheck:app', 'typecheck:all'],
+  check: ['check', 'verify', 'validate', 'check:all', 'verify:ci', 'verify:all', 'validate:ci'],
+  build: ['build', 'compile', 'bundle', 'build:prod', 'build:production', 'build:ci', 'build:all'],
+  bench: ['bench', 'benchmark', 'bench:ci'],
 };
 
 function platformExecutable(executable: string): string {
@@ -243,7 +245,7 @@ export class TaskRunnerService {
         expose: true,
       });
     }
-    const timeoutSeconds = Math.min(Math.max(request.timeoutSeconds ?? selected.timeoutSeconds, 1), 600);
+    const timeoutSeconds = Math.min(Math.max(request.timeoutSeconds ?? selected.timeoutSeconds, 1), 3600);
     if (selected.source === 'builtin-static') return this.executeStaticCheck(selected, resolver);
     return this.execute(selected, resolver.canonicalRoot, timeoutSeconds, request.signal);
   }

@@ -103,6 +103,15 @@ describe('SecureFilesystemService', () => {
     expect(batch.applied).toHaveLength(2);
     expect((await filesystem.readTextFile({ ...auth(), path: 'src/app.ts' })).content).toContain('value = 3');
     expect((await filesystem.readTextFile({ ...auth(), path: 'src/second.ts' })).content).toContain('second = 2');
+
+    const sameFile = await filesystem.readTextFile({ ...auth(), path: 'src/app.ts' });
+    const multi = await filesystem.applyBatchPatch({ ...auth(), changes: [
+      { path: 'src/app.ts', search: 'value = 3', replacement: 'value = 4', expectedSha256: sameFile.sha256 },
+      { path: 'src/app.ts', search: 'needle here', replacement: 'needle updated', expectedSha256: sameFile.sha256 },
+    ] });
+    expect(multi.applied).toHaveLength(1);
+    expect((await filesystem.readTextFile({ ...auth(), path: 'src/app.ts' })).content).toContain('value = 4');
+    expect((await filesystem.readTextFile({ ...auth(), path: 'src/app.ts' })).content).toContain('needle updated');
   });
 
   test('applies exact patch, append, copy, move and backed-up delete with SHA guards', async () => {
@@ -117,6 +126,31 @@ describe('SecureFilesystemService', () => {
     expect(deleted.originalPath).toBe(path.join('src', 'moved.ts'));
     expect(await readFile(path.join(workspace, 'backups', projectA.id, `${deleted.backupId}.bak`), 'utf8')).toContain('value = 2');
     await expect(filesystem.readTextFile({ ...auth(), path: 'src/moved.ts' })).rejects.toMatchObject({ code: 'PATH_NOT_FOUND' });
+  });
+
+  test('reads and edits bounded ranges in text files larger than the normal 1 MiB limit', async () => {
+    const largeLines = Array.from({ length: 110_000 }, (_, index) => `line-${index + 1}`).join('\n') + '\n';
+    await writeFile(path.join(rootA, 'src', 'large.txt'), largeLines, 'utf8');
+    expect(Buffer.byteLength(largeLines, 'utf8')).toBeGreaterThan(1024 * 1024);
+    await expect(filesystem.readTextFile({ ...auth(), path: 'src/large.txt' })).rejects.toMatchObject({ code: 'FILE_TOO_LARGE' });
+
+    const range = await filesystem.readTextRange({ ...auth(), path: 'src/large.txt', startLine: 50_000, maxLines: 3, maxBytes: 4096 });
+    expect(range.content).toBe('line-50000\nline-50001\nline-50002');
+    expect(range.startLine).toBe(50_000);
+    expect(range.endLine).toBe(50_002);
+    expect(range.truncated).toBe(true);
+
+    const replaced = await filesystem.replaceTextLines({
+      ...auth(),
+      path: 'src/large.txt',
+      startLine: 50_001,
+      endLine: 50_001,
+      replacement: 'line-50001-updated\n',
+      expectedSha256: range.sha256,
+    });
+    expect(replaced.created).toBe(false);
+    const after = await filesystem.readTextRange({ ...auth(), path: 'src/large.txt', startLine: 50_000, maxLines: 3, maxBytes: 4096 });
+    expect(after.content).toBe('line-50000\nline-50001-updated\nline-50002');
   });
 
   test('rejects unsafe write destinations and oversized/private-key content', async () => {

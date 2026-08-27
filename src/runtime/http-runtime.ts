@@ -72,7 +72,7 @@ export async function startHttpRuntime(config: AppConfig, logger: JsonLogger): P
     host: config.host,
     port: config.port,
   });
-  const controlCenter = new ControlCenterService(services.projects, services.permissionSessions, services.policies, services.aiJobs, services.previews, services.git, services.processes, tunnel, autoStart, services.auditUsage, { ...config, databasePath: databaseFilename });
+  const controlCenter = new ControlCenterService(services.projects, services.authorization, services.permissionSessions, services.policies, services.aiJobs, services.previews, services.git, services.processes, tunnel, autoStart, services.auditUsage, { ...config, databasePath: databaseFilename });
   const mcpHandler = createMcpHandler(() => createMcpServer({
     authorization: services.authorization,
     filesystem: services.filesystem,
@@ -172,6 +172,11 @@ export async function startHttpRuntime(config: AppConfig, logger: JsonLogger): P
           writeJson(res, 200, { removed: true });
           return;
         }
+      }
+      const projectAccessMatch = /^\/api\/projects\/([^/]+)\/access$/u.exec(pathname);
+      if (projectAccessMatch && req.method === 'GET') {
+        writeJson(res, 200, { access: await controlCenter.projectAccess(decodeURIComponent(projectAccessMatch[1] ?? '')) });
+        return;
       }
       const projectSessionsMatch = /^\/api\/projects\/([^/]+)\/permission-sessions$/u.exec(pathname);
       if (projectSessionsMatch) {

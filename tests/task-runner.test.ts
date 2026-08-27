@@ -77,6 +77,8 @@ describe('structured task runner', () => {
       verify: 'node scripts/verify.mjs',
       compile: 'vite build',
       benchmark: 'node scripts/bench.mjs',
+      'test:e2e': 'playwright test',
+      'build:prod': 'vite build',
     } }), 'utf8');
     await writeFile(path.join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n', 'utf8');
 
@@ -130,11 +132,16 @@ describe('structured task runner', () => {
     ]));
   });
 
-  test('runs without shell interpolation, drops arbitrary parent env and redacts secret-shaped output', async () => {
+  test('runs without shell interpolation, keeps safe toolchain env, drops arbitrary parent env and redacts secret-shaped output', async () => {
     process.env.MCP_RUNNER_SECRET = 'must-not-leak';
+    process.env.JAVA_HOME = path.join(root, 'fake-jdk');
+    process.env.VITE_PUBLIC_TEST_VALUE = 'public-value';
     await writeFile(path.join(root, 'scripts', 'test.mjs'), [
       "console.log('argv=' + JSON.stringify(process.argv.slice(2)));",
       "console.log('env=' + String(process.env.MCP_RUNNER_SECRET));",
+      "console.log('java=' + String(process.env.JAVA_HOME));",
+      "console.log('vite=' + String(process.env.VITE_PUBLIC_TEST_VALUE));",
+      "console.log('ci=' + String(process.env.CI));",
       "console.log('token=supersecretvalue');",
     ].join('\n'), 'utf8');
     await writeFile(path.join(root, '.mcp', 'tasks.json'), JSON.stringify({
@@ -146,6 +153,9 @@ describe('structured task runner', () => {
     expect(result.success).toBe(true);
     expect(result.stdout).toContain('"&&","whoami",";","echo injected"');
     expect(result.stdout).toContain('env=undefined');
+    expect(result.stdout).toContain('java=' + path.join(root, 'fake-jdk'));
+    expect(result.stdout).toContain('vite=public-value');
+    expect(result.stdout).toContain('ci=undefined');
     expect(result.stdout).toContain('token=[REDACTED]');
     expect(result.stdout).not.toContain('supersecretvalue');
     expect(result.stdout).not.toContain('must-not-leak');
@@ -169,11 +179,11 @@ describe('structured task runner', () => {
     expect(config.failureKind).toBe('configuration_required');
   });
 
-  test('enforces output cap and terminates the task', async () => {
-    await writeFile(path.join(root, 'scripts', 'output.mjs'), "process.stdout.write('x'.repeat(20000)); setInterval(() => {}, 1000);", 'utf8');
+  test('caps captured output without killing an otherwise successful task', async () => {
+    await writeFile(path.join(root, 'scripts', 'output.mjs'), "process.stdout.write('x'.repeat(20000));", 'utf8');
     await writeFile(path.join(root, '.mcp', 'tasks.json'), JSON.stringify({ version: 1, profiles: { check: { executable: 'node', args: ['scripts/output.mjs'] } } }), 'utf8');
     const result = await runner.runTask({ projectId, permissionSessionId: sessionId, task: 'check' });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
     expect(result.outputTruncated).toBe(true);
     expect(Buffer.byteLength(result.stdout) + Buffer.byteLength(result.stderr)).toBeLessThanOrEqual(4096);
   });

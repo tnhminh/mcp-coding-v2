@@ -3,7 +3,7 @@
 Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
 
 ## Product roadmap / epic mapping
-- [x] **Phase 1 — Bridge / engineering control plane.** Primarily P0-P4.7 plus the core Project Brain, Context/Impact, AI Job, Browser/Preview and Control Center primitives needed for a useful bridge. Verified complete; current full gate is 25 files / 102 tests PASS.
+- [x] **Phase 1 — Bridge / engineering control plane.** Primarily P0-P4.8 plus the core Project Brain, Context/Impact, AI Job, Browser/Preview and Control Center primitives needed for a useful bridge. Verified complete and subsequently hardened; current full gate is 25 files / 113 tests PASS.
 - [~] **Phase 2 — Skill Runtime V1.** Convert discovered AGENTS/SKILL/prompt/rule files into normalized, scoped, activatable runtime behavior with tool requirements, composition/conflict rules and verification hooks. Tracked under P16 below.
 - [ ] **Phase 3 — Integrated Coding Harness.** Compose existing primitives into task state, context selection, planning, multi-step execution, verification/retry and checkpoints. Tracked under P17.
 - [ ] **Phase 4 — Autonomous Vibecode.** Higher-level goal execution built on the secured Bridge + Skill Runtime + Coding Harness. Tracked under P18.
@@ -78,12 +78,14 @@ The P-number epics are implementation workstreams; the Phase 1-4 roadmap describ
   - Evidence: `project_readiness` separates missing dependencies/configuration from source failures; `prepare_workspace` installs missing declared dependencies and captures baseline verification; task results expose `failureKind`; legacy static `check` is suppressed when package/ecosystem verifiers already exist.
 - [x] P4.7 Phase 1 Bridge Finalization.
   - Evidence: native local Git status/diff/log/branch/stage/unstage/commit/restore tools; runtime-owned long-running process profiles/list/start/status/stop; Git + Processes Control Center panels/APIs; shutdown cleanup; machine-verifiable Phase 1 tool/capability gate. Full gate 25 files / 101 tests PASS.
+- [x] P4.8 Phase 1.5 Vibecode Hardening — Critical / High / Medium false-negative reduction.
+  - Evidence: process output truncation no longer kills successful verifiers; safe toolchain/public frontend env inheritance without forced `CI=1`; adaptive context + Brain freshness; explicit scan truncation; scoped nested guidance; expanded task/process discovery/timeouts; baseline-aware/deferred verification without false DONE; same-file multi-patch; 16 MiB ranged text read/edit primitives; TS alias resolution + structural/lexical coverage honesty; monorepo read-only Git scope; deterministic same-principal permission dominance; richer preview assets/browser discovery with trusted-local network allowlist; multi-toolchain readiness; access-aware Control Center startup. Final gate 25 files / 113 tests PASS, npm audit 0, diff check PASS, localhost health/control-center HTTP 200 and browser review 0 page/console/HTTP errors.
 
 ## EPIC P5 — Project Brain
 - [x] P5-T01 Incremental file/language/symbol/import/reference/test/config index.
   - Evidence: bounded Secure Filesystem scan, language/category metadata, SHA-based incremental TS/JS reuse and SQLite snapshot persistence across runtime recreation.
 - [x] P5-T02 TS/JS AST parser and graph edges.
-  - Evidence: TypeScript compiler API extracts declarations, identifier references and import/export/require edges with relative module resolution.
+  - Evidence: TypeScript compiler API extracts declarations, identifier references and import/export/require edges with relative plus bounded `tsconfig.json` `baseUrl`/`paths` alias resolution; Brain summary states TS/JS structural vs other-language lexical-only coverage.
 - [x] P5-T03 brain status/build/refresh/summary and graph query tools.
   - Evidence: brain_build, brain_status, find_symbol and symbol_references MCP tools; corrupted persisted snapshots fail closed to not_indexed.
 
@@ -93,7 +95,7 @@ The P-number epics are implementation workstreams; the Phase 1-4 roadmap describ
 - [ ] P6-T02 richer BM25 + Git/task-aware ranking.
   - Note: richer BM25 + Git/task-aware ranking remains deferred; the local Git runtime is already implemented, but current weighted lexical+graph retrieval does not yet consume Git/task signals and is not claimed as BM25.
 - [x] P6-T03 bounded context bundle + blast-radius/related-test analysis.
-  - Evidence: context_bundle enforces file/character budgets; impact_analysis traces file/symbol declarations, references, importers, second-wave importers, related tests and nearby configs.
+  - Evidence: context_bundle enforces adaptive file/character budgets with stopword filtering; impact_analysis traces file/symbol declarations, references, importers, second-wave importers, related tests and nearby configs. Brain-backed queries auto-refresh stale snapshots before use.
 
 ## EPIC P7 — Workflow + Tasks + AI Jobs
 - [x] P7-T00 autonomous IMPLEMENT/TEST/REVIEW/FIX coding-cycle orchestration over Brain/Context/Impact + ApplyVerify.
@@ -108,12 +110,12 @@ The P-number epics are implementation workstreams; the Phase 1-4 roadmap describ
 
 ## EPIC P8 — Git/GitHub
 - [x] safe project-scoped local Git read/write operations.
-  - Evidence: Phase 1 P4.7 provides status/diff/log/branches/stage/unstage/create/switch/commit/restore with exact registered-repository scoping and no implicit push.
+  - Evidence: Phase 1 P4.7/P4.8 provides status/diff/log/branches/stage/unstage/create/switch/commit/restore with project-scoped read-only support for monorepo subprojects, repository-root-only Git mutations and no implicit push.
 - [ ] GitHub/remote publishing, secret scan/elevation before push and private-by-default repository creation.
 
 ## EPIC P9 — Browser + Preview
 - [x] P9-T01 Playwright browser review with DOM/screenshot/console/network/action evidence.
-  - Evidence: local installed Edge/Chrome via `playwright-core`; browser only opens server-created `preview_id`; cross-origin HTTP/WebSocket blocked; interactive fixture + screenshot test PASS.
+  - Evidence: local installed Edge/Chrome via `playwright-core`; browser only opens server-created `preview_id`; page egress is denied by default with optional explicit trusted-local `MCP_BROWSER_ALLOWED_ORIGINS`; interactive fixture + screenshot test PASS.
 - [x] P9-T02 loopback static/dev preview discovery, lifecycle and health without assuming port 3000.
   - Evidence: dynamic loopback port allocation; static sensitive-path blocking; recognized framework dev profile start/health/log redaction/process-tree stop tests PASS.
 - [ ] P9-T03 richer browser assertions, multi-page session persistence and optional stronger OS/network sandboxing.

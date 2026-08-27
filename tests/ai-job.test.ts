@@ -80,18 +80,18 @@ describe('persistent AI coding jobs', () => {
     });
     expect(failed.job).toMatchObject({ status: 'awaiting_fix', iteration: 1 });
     expect(failed.cycle).toMatchObject({ nextAction: 'fix_and_retry' });
-    expect(failed.cycle.verification.rolledBack).toBe(true);
-    expect(await readFile(path.join(root, 'src', 'main.ts'), 'utf8')).toContain('answer = 1');
+    expect(failed.cycle.verification).toMatchObject({ verified: false, verificationStatus: 'baseline_accepted', rolledBack: false });
+    expect(await readFile(path.join(root, 'src', 'main.ts'), 'utf8')).toContain('answer = 3');
 
-    const rolledBack = await services.filesystem.readTextFile({ projectId: project.id, path: 'src/main.ts' });
+    const retained = await services.filesystem.readTextFile({ projectId: project.id, path: 'src/main.ts' });
     const verified = await services.aiJobs.cycle({
       jobId: job.id,
       changes: [{
         op: 'replace',
         path: 'src/main.ts',
-        search: 'answer = 1',
+        search: 'answer = 3',
         replacement: 'answer = 2',
-        expectedSha256: rolledBack.sha256,
+        expectedSha256: retained.sha256,
       }],
       tasks: ['test'],
     });

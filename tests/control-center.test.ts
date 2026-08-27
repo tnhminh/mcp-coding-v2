@@ -231,11 +231,20 @@ describe('Control Center', () => {
       body: JSON.stringify({ name: 'Job Project', alias: 'job-project', rootPath: projectRoot }),
     });
     const project = (await projectResponse.json() as { project: { id: string } }).project;
+    const missingAccessResponse = await fetch(`http://127.0.0.1:${port}/api/projects/${project.id}/access`);
+    expect(missingAccessResponse.status).toBe(200);
+    const missingAccess = (await missingAccessResponse.json() as { access: { capabilities: Array<{ capability: string; usable: boolean }>; codingEnvelope: { usable: boolean } } }).access;
+    expect(missingAccess.codingEnvelope.usable).toBe(false);
+    expect(missingAccess.capabilities.find((item) => item.capability === 'filesystem.read')?.usable).toBe(false);
+
     const sessionResponse = await fetch(`http://127.0.0.1:${port}/api/projects/${project.id}/permission-sessions`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ principalId: 'control-center-agent', capabilities: ['filesystem.read', 'filesystem.write', 'command.run'], ttlSeconds: 3600 }),
     });
     expect(sessionResponse.status).toBe(201);
+    const grantedAccess = (await fetch(`http://127.0.0.1:${port}/api/projects/${project.id}/access`).then((response) => response.json()) as { access: { capabilities: Array<{ capability: string; usable: boolean }>; codingEnvelope: { usable: boolean } } }).access;
+    expect(grantedAccess.codingEnvelope.usable).toBe(true);
+    expect(grantedAccess.capabilities.find((item) => item.capability === 'filesystem.read')?.usable).toBe(true);
 
     const created = await fetch(`http://127.0.0.1:${port}/api/projects/${project.id}/ai-jobs`, {
       method: 'POST', headers: { 'content-type': 'application/json' },

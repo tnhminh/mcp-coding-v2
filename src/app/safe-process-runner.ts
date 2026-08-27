@@ -7,7 +7,14 @@ const ENV_ALLOWLIST = [
   'PATH', 'PATHEXT', 'SystemRoot', 'SYSTEMROOT', 'WINDIR', 'ComSpec', 'COMSPEC',
   'TEMP', 'TMP', 'HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'PROGRAMDATA',
   'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE', 'PROCESSOR_IDENTIFIER',
+  // Toolchain/location variables are safe to inherit and are required by many real builds.
+  'JAVA_HOME', 'JDK_HOME', 'ANDROID_HOME', 'ANDROID_SDK_ROOT', 'ANDROID_NDK_HOME',
+  'GOROOT', 'GOPATH', 'GOMODCACHE', 'CARGO_HOME', 'RUSTUP_HOME',
+  'VIRTUAL_ENV', 'PYTHONHOME', 'PYTHONPATH', 'DOTNET_ROOT', 'NUGET_PACKAGES',
+  'NODE_OPTIONS', 'COREPACK_HOME', 'NPM_CONFIG_PREFIX', 'PNPM_HOME', 'BUN_INSTALL',
+  'NO_PROXY', 'no_proxy',
 ] as const;
+const PUBLIC_ENV_PREFIX_ALLOWLIST = ['VITE_', 'NEXT_PUBLIC_', 'REACT_APP_'] as const;
 
 export interface SafeProcessSpec {
   executable: string;
@@ -35,10 +42,16 @@ export interface SafeProcessResult {
 }
 
 export function sanitizedEnvironment(extra: Readonly<Record<string, string>> = {}): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { CI: '1', NO_COLOR: '1', FORCE_COLOR: '0' };
+  // stdin is disabled by the process runner, so forcing CI=1 is unnecessary and can
+  // materially change test/build behavior. Preserve only non-secret toolchain state.
+  const env: NodeJS.ProcessEnv = { NO_COLOR: '1', FORCE_COLOR: '0' };
   for (const key of ENV_ALLOWLIST) {
     const value = process.env[key];
     if (value !== undefined) env[key] = value;
+  }
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value === undefined) continue;
+    if (PUBLIC_ENV_PREFIX_ALLOWLIST.some((prefix) => key.startsWith(prefix))) env[key] = value;
   }
   for (const [key, value] of Object.entries(extra)) env[key] = value;
   return env;
@@ -78,7 +91,7 @@ export async function killProcessTree(child: ChildProcess): Promise<void> {
 
 export async function runSafeProcess(spec: SafeProcessSpec): Promise<SafeProcessResult> {
   const started = Date.now();
-  const timeoutSeconds = Math.min(Math.max(spec.timeoutSeconds, 1), 600);
+  const timeoutSeconds = Math.min(Math.max(spec.timeoutSeconds, 1), 3600);
   const maxOutputBytes = Math.min(Math.max(spec.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES, 1024), 1024 * 1024);
   const captureOutput = spec.captureOutput ?? true;
   let child: ChildProcess;
@@ -110,11 +123,7 @@ export async function runSafeProcess(spec: SafeProcessSpec): Promise<SafeProcess
       if (target === 'stdout') stdout = Buffer.concat([stdout, accepted]);
       else stderr = Buffer.concat([stderr, accepted]);
     }
-    if (chunk.length > remaining && !outputTruncated) {
-      outputTruncated = true;
-      killing = true;
-      void killProcessTree(child);
-    }
+    if (chunk.length > remaining) outputTruncated = true;
   };
 
   if (captureOutput) {
@@ -149,7 +158,7 @@ export async function runSafeProcess(spec: SafeProcessSpec): Promise<SafeProcess
     return {
       executable: spec.executable,
       args: [...spec.args],
-      success: !timedOut && !cancelled && !outputTruncated && !killing && outcome.exitCode === 0,
+      success: !timedOut && !cancelled && !killing && outcome.exitCode === 0,
       exitCode: outcome.exitCode,
       signal: outcome.signal,
       stdout: redactProcessOutput(stdout.toString('utf8')),
@@ -160,7 +169,7 @@ export async function runSafeProcess(spec: SafeProcessSpec): Promise<SafeProcess
       outputTruncated,
     };
   } catch (error) {
-    if (timedOut || cancelled || outputTruncated) {
+    if (timedOut || cancelled) {
       return {
         executable: spec.executable,
         args: [...spec.args],

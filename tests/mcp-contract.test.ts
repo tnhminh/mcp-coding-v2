@@ -29,7 +29,7 @@ async function assertToolContract(client: Client): Promise<void> {
     'brain_build', 'brain_status', 'find_symbol', 'symbol_references', 'context_bundle', 'impact_analysis', 'coding_cycle',
     'agent_job_create', 'agent_job_list', 'agent_job_status', 'agent_job_cycle', 'agent_job_complete', 'agent_job_cancel',
     'preview_profiles', 'preview_list', 'preview_start', 'preview_status', 'preview_stop', 'browser_review', 'apply_and_verify',
-    'read_file', 'read_files', 'stat_path', 'list_files', 'search_text', 'write_file', 'append_file', 'diff_file', 'apply_patch', 'batch_patch', 'copy_file', 'move_file', 'delete_file',
+    'read_file', 'read_files', 'read_file_range', 'replace_file_lines', 'stat_path', 'list_files', 'search_text', 'write_file', 'append_file', 'diff_file', 'apply_patch', 'batch_patch', 'copy_file', 'move_file', 'delete_file',
   ]));
 
   const { resources } = await client.listResources();

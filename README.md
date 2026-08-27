@@ -5,12 +5,13 @@ Production-oriented MCP software-engineering control plane for AI coding agents.
 ## Current status
 
 - **Phase 1 — Bridge:** verified complete.
-- **Phase 2 — Skill Runtime V1:** active.
+- **Phase 1.5 — Vibecode Hardening:** implementation + verification complete in the current working tree.
+- **Phase 2 — Skill Runtime V1:** active / next implementation slice is P16-T01.
 - **Phase 3 — Integrated Coding Harness:** next.
 - **Phase 4 — Autonomous Vibecode:** later.
 - **Product:** IN DEVELOPMENT — not production ready.
 
-Verified Phase 1/core capabilities include MCP 2026-07-28 stdio + Streamable HTTP, SQLite Project Registry, permission sessions/policies, secure filesystem, structured tasks/commands, managed processes, local Git, Project Brain/context/impact, apply-and-verify, AI Jobs/coding cycle, loopback preview/browser QA, Audit/Usage and the localhost Control Center.
+Verified Phase 1/core capabilities include MCP 2026-07-28 stdio + Streamable HTTP, SQLite Project Registry, permission sessions/policies, secure/ranged filesystem operations, structured tasks/commands, managed processes, local Git with monorepo read scope, Project Brain/context/impact, baseline-aware/deferred apply-and-verify, AI Jobs/coding cycle, loopback preview/browser QA, Audit/Usage and the localhost Control Center. Current full gate is 25 files / 113 tests PASS and the compiled Control Center exposes 64 MCP tools.
 
 ## AI contributors
 

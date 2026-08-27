@@ -74,8 +74,12 @@ describe('local workspace and skill discovery', () => {
     expect(testingSkill).toBeDefined();
     const read = await services.skills.readSkill({ projectId, permissionSessionId: sessionId, path: testingSkill?.path ?? '' });
     expect(read.content).toContain('Run focused tests first');
-    const guidance = await services.skills.guidanceBundle({ projectId, permissionSessionId: sessionId });
-    expect(guidance.items.map((item) => item.path.replace(/\\/gu, '/'))).toEqual(expect.arrayContaining(['AGENTS.md', 'src/AGENTS.md', 'CLAUDE.md', '.clinerules', '.codex/skills/refactor/SKILL.md']));
+    const globalGuidance = await services.skills.guidanceBundle({ projectId, permissionSessionId: sessionId });
+    expect(globalGuidance.items.map((item) => item.path.replace(/\\/gu, '/'))).toEqual(expect.arrayContaining(['AGENTS.md', 'CLAUDE.md', '.clinerules', '.codex/skills/refactor/SKILL.md']));
+    expect(globalGuidance.items.map((item) => item.path.replace(/\\/gu, '/'))).not.toContain('src/AGENTS.md');
+    expect(globalGuidance.omitted.some((item) => item.reason === 'SCOPED_GUIDANCE_REQUIRES_TARGET' && item.path.replace(/\\/gu, '/') === 'src/AGENTS.md')).toBe(true);
+    const guidance = await services.skills.guidanceBundle({ projectId, permissionSessionId: sessionId, targetPaths: ['src/feature/example.ts'] });
+    expect(guidance.items.map((item) => item.path.replace(/\\/gu, '/'))).toContain('src/AGENTS.md');
     expect(guidance.rules.join(' ')).toContain('Nested AGENTS.md');
     await expect(services.skills.readSkill({ projectId, permissionSessionId: sessionId, path: 'package.json' })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
   });

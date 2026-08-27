@@ -18,7 +18,7 @@ export interface CodingCycleResult {
   objective: string;
   iteration: number;
   maxIterations: number;
-  state: 'fix_required' | 'review_required' | 'stopped';
+  state: 'fix_required' | 'review_required' | 'verification_deferred' | 'stopped';
   nextAction: CodingCycleNextAction;
   changedPaths: string[];
   verification: ApplyVerifyResult;
@@ -29,6 +29,15 @@ export interface CodingCycleResult {
 
 function normalized(relativePath: string): string {
   return relativePath.replace(/\\/gu, '/');
+}
+
+function contextBudget(objective: string, seedCount: number): { maxFiles: number; maxChars: number } {
+  const terms = objective.trim().split(/\s+/u).filter(Boolean).length;
+  const complexity = terms + seedCount * 3;
+  if (complexity >= 35) return { maxFiles: 32, maxChars: 96_000 };
+  if (complexity >= 18) return { maxFiles: 24, maxChars: 64_000 };
+  if (complexity >= 8) return { maxFiles: 16, maxChars: 40_000 };
+  return { maxFiles: 12, maxChars: 24_000 };
 }
 
 export class CodingCycleService {
@@ -66,10 +75,13 @@ export class CodingCycleService {
       throw new AppError({ code: 'VALIDATION_ERROR', message: 'Coding cycle requires 1 to 20 changes.', httpStatus: 400, expose: true });
     }
 
+    const requiredCapabilities = request.tasks.length > 0
+      ? ['filesystem.read', 'filesystem.write', 'command.run'] as const
+      : ['filesystem.read', 'filesystem.write'] as const;
     const resolvedSession = await this.authorization.resolvePermissionSession({
       projectId: request.projectId,
       ...(request.permissionSessionId === undefined ? {} : { permissionSessionId: request.permissionSessionId }),
-      capabilities: ['filesystem.read', 'filesystem.write', 'command.run'],
+      capabilities: requiredCapabilities,
     });
     const base = { projectId: request.projectId, permissionSessionId: resolvedSession.id };
     const changedPaths = [...new Set(request.changes.map((change) => normalized(change.path)))];
@@ -83,6 +95,43 @@ export class CodingCycleService {
       tasks: request.tasks,
       rollbackOnFailure: request.rollbackOnFailure ?? true,
     });
+
+    if (verification.verificationDeferred) {
+      await this.brain.build(base);
+      const afterReview = await this.review(base, objective, reviewSeeds);
+      return {
+        objective,
+        iteration,
+        maxIterations,
+        state: 'verification_deferred',
+        nextAction: 'review',
+        changedPaths,
+        verification,
+        beforeReview,
+        afterReview,
+        agentInstruction: 'No structured task verifier is available, so the change is intentionally kept with verification deferred. Use the workspace preview/browser strategy or another explicit verifier before declaring DONE; semantic review alone is not sufficient.',
+      };
+    }
+
+    if (verification.verificationStatus === 'baseline_accepted') {
+      await this.brain.build(base);
+      const afterReview = await this.review(base, objective, reviewSeeds);
+      const reachedLimit = iteration >= maxIterations;
+      return {
+        objective,
+        iteration,
+        maxIterations,
+        state: reachedLimit ? 'stopped' : 'fix_required',
+        nextAction: reachedLimit ? 'stop' : 'fix_and_retry',
+        changedPaths,
+        verification,
+        beforeReview,
+        afterReview,
+        agentInstruction: reachedLimit
+          ? 'The change was kept because verification matched a pre-existing source failure with no new regression, but the verifier is still red and the iteration budget is exhausted. Do not declare DONE.'
+          : 'The change was kept because verification matched a pre-existing source failure with no new regression. This is not a verified state: diagnose/fix the baseline failure or use another explicit verifier, then run the next coding cycle. Do not declare DONE while the verifier remains red.',
+      };
+    }
 
     if (!verification.verified) {
       const reachedLimit = iteration >= maxIterations;
@@ -123,9 +172,10 @@ export class CodingCycleService {
     objective: string,
     seeds: readonly string[],
   ): Promise<CodingCycleReview> {
+    const budget = contextBudget(objective, seeds.length);
     const [brain, context] = await Promise.all([
       this.brain.status(base),
-      this.contextImpact.contextBundle({ ...base, query: objective, maxFiles: 8, maxChars: 12_000 }),
+      this.contextImpact.contextBundle({ ...base, query: objective, maxFiles: budget.maxFiles, maxChars: budget.maxChars }),
     ]);
     const impacts: ImpactResult[] = [];
     const unresolvedSeeds: string[] = [];

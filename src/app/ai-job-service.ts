@@ -26,9 +26,21 @@ function compactCycleEvidence(cycle: CodingCycleResult): Record<string, unknown>
     changedPaths: cycle.changedPaths,
     verification: {
       verified: cycle.verification.verified,
+      status: cycle.verification.verificationStatus,
+      verificationDeferred: cycle.verification.verificationDeferred,
+      acceptedBaselineFailures: cycle.verification.acceptedBaselineFailures,
       rolledBack: cycle.verification.rolledBack,
       rollbackErrors: cycle.verification.rollbackErrors,
       verificationError: cycle.verification.verificationError,
+      baselineTasks: cycle.verification.baseline.map((item) => ({
+        task: item.task,
+        success: item.success,
+        exitCode: item.exitCode,
+        failureKind: item.failureKind,
+        outputTruncated: item.outputTruncated,
+        stdout: clipped(item.stdout),
+        stderr: clipped(item.stderr),
+      })),
       tasks: cycle.verification.verification.map((item) => ({
         task: item.task,
         success: item.success,

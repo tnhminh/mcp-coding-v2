@@ -156,6 +156,32 @@ describe('authorization foundation', () => {
     })).resolves.toMatchObject({ id: newer.id });
   });
 
+  test('auto-resolves a newer same-principal capability superset without ambiguity', async () => {
+    const project = await addProject('dominant');
+    const now = new Date('2026-08-27T10:00:00.000Z');
+    const narrow = createPermissionSession({
+      projectId: project.id,
+      principalId: 'trusted-agent',
+      capabilities: ['filesystem.read'],
+      ttlSeconds: 3600,
+    }, { now });
+    const broad = createPermissionSession({
+      projectId: project.id,
+      principalId: 'trusted-agent',
+      capabilities: ['filesystem.read', 'filesystem.write', 'command.run'],
+      ttlSeconds: 3600,
+    }, { now: new Date(now.getTime() + 1000) });
+    await sessions.save(narrow);
+    await sessions.save(broad);
+    await expect(authorization.authorize({
+      projectId: project.id,
+      capability: 'filesystem.read',
+      now: new Date(now.getTime() + 2000),
+    })).resolves.toMatchObject({ id: broad.id });
+    const snapshot = await authorization.inspectAccess({ projectId: project.id, now: new Date(now.getTime() + 2000) });
+    expect(snapshot.codingEnvelope).toMatchObject({ state: 'granted', usable: true });
+  });
+
   test('omitted permission_session_id fails closed when distinct active authorization envelopes exist', async () => {
     const project = await addProject('ambiguous');
     const first = createPermissionSession({ projectId: project.id, principalId: 'agent-a', capabilities: ['filesystem.read'], ttlSeconds: 3600 });
@@ -172,7 +198,7 @@ describe('authorization foundation', () => {
     expect(caught).toBeInstanceOf(AppError);
     if (!(caught instanceof AppError)) throw new Error('Expected AppError');
     expect(caught.code).toBe('PERMISSION_REQUIRED');
-    expect(caught.message).toContain('Multiple distinct active permission sessions');
+    expect(caught.message).toContain('Multiple principals or incomparable active permission sessions');
   });
 
   test('access introspection reports usable, missing, ambiguous and policy-denied capabilities without exposing session ids', async () => {

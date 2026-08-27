@@ -87,18 +87,29 @@ describe('native Git runtime', () => {
     expect(restored.status.clean).toBe(true);
   });
 
-  test('refuses a registered project nested inside a larger repository root', async () => {
+  test('supports project-scoped Git reads for a monorepo subproject while keeping Git writes root-only', async () => {
     const nested = path.join(root, 'nested');
     await mkdir(nested);
+    await writeFile(path.join(nested, 'app.txt'), 'initial\n', 'utf8');
+    await git(['add', 'nested/app.txt']);
+    await git(['commit', '-m', 'add nested app']);
     const project = createProject({ name: 'Nested', alias: 'nested-git', rootPath: nested });
     await services.projects.save(project);
     const session = createPermissionSession({
       projectId: project.id,
       principalId: 'nested-agent',
-      capabilities: ['git.read'],
+      capabilities: ['filesystem.read', 'filesystem.write', 'command.run', 'git.read', 'git.write'],
       ttlSeconds: 3600,
     });
     await services.permissionSessions.save(session);
-    await expect(services.git.status({ projectId: project.id, permissionSessionId: session.id })).rejects.toMatchObject({ code: 'PATH_OUTSIDE_PROJECT' });
+
+    const clean = await services.git.status({ projectId: project.id, permissionSessionId: session.id });
+    expect(clean.clean).toBe(true);
+    await writeFile(path.join(nested, 'app.txt'), 'changed\n', 'utf8');
+    const dirty = await services.git.status({ projectId: project.id, permissionSessionId: session.id });
+    expect(dirty.clean).toBe(false);
+    expect((await services.git.diff({ projectId: project.id, permissionSessionId: session.id })).diff).toContain('+changed');
+    expect((await services.git.log({ projectId: project.id, permissionSessionId: session.id, limit: 5 })).commits.map((item) => item.subject)).toContain('add nested app');
+    await expect(services.git.stage({ projectId: project.id, permissionSessionId: session.id, paths: ['app.txt'] })).rejects.toMatchObject({ code: 'PATH_OUTSIDE_PROJECT' });
   });
 });

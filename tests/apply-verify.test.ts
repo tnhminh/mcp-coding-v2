@@ -71,6 +71,37 @@ describe('apply + verify orchestration', () => {
     expect((await services.filesystem.readTextFile({ projectId, permissionSessionId: sessionId, path: 'src/value.txt' })).content).toBe('good\n');
   });
 
+  test('supports multiple exact patches to one file using the same original SHA guard', async () => {
+    await writeFile(path.join(root, 'src', 'multi.txt'), 'alpha beta gamma\n', 'utf8');
+    const current = await services.filesystem.readTextFile({ projectId, permissionSessionId: sessionId, path: 'src/multi.txt' });
+    const result = await services.applyVerify.applyAndVerify({
+      projectId,
+      permissionSessionId: sessionId,
+      changes: [
+        { op: 'replace', path: 'src/multi.txt', search: 'alpha', replacement: 'ALPHA', expectedSha256: current.sha256 },
+        { op: 'replace', path: 'src/multi.txt', search: 'gamma', replacement: 'GAMMA', expectedSha256: current.sha256 },
+      ],
+      tasks: [],
+    });
+    expect(result.verificationStatus).toBe('deferred');
+    expect(result.applied).toHaveLength(1);
+    expect((await services.filesystem.readTextFile({ projectId, permissionSessionId: sessionId, path: 'src/multi.txt' })).content).toBe('ALPHA beta GAMMA\n');
+  });
+
+  test('rejects mixed write and replace operations for the same path before mutation', async () => {
+    const current = await services.filesystem.readTextFile({ projectId, permissionSessionId: sessionId, path: 'src/value.txt' });
+    await expect(services.applyVerify.applyAndVerify({
+      projectId,
+      permissionSessionId: sessionId,
+      changes: [
+        { op: 'replace', path: 'src/value.txt', search: 'good', replacement: 'better', expectedSha256: current.sha256 },
+        { op: 'write', path: 'src/value.txt', content: 'other\n', expectedSha256: current.sha256 },
+      ],
+      tasks: [],
+    })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    expect((await services.filesystem.readTextFile({ projectId, permissionSessionId: sessionId, path: 'src/value.txt' })).content).toBe('good\n');
+  });
+
   test('rejects unavailable verification profiles before mutating project files', async () => {
     const current = await services.filesystem.readTextFile({ projectId, permissionSessionId: sessionId, path: 'src/value.txt' });
     await expect(services.applyVerify.applyAndVerify({
@@ -112,6 +143,39 @@ describe('apply + verify orchestration', () => {
     expect(result.rolledBack).toBe(true);
     await expect(services.filesystem.readTextFile({ projectId, permissionSessionId: sessionId, path: 'src/generated.txt' })).rejects.toMatchObject({ code: 'PATH_NOT_FOUND' });
     expect((await services.filesystem.readTextFile({ projectId, permissionSessionId: sessionId, path: 'src/value.txt' })).content).toBe('good\n');
+  });
+
+  test('keeps a no-regression change against an unchanged pre-existing source failure without claiming verification success', async () => {
+    await writeFile(path.join(root, 'scripts', 'verify.mjs'), "console.error('pre-existing-failure'); process.exit(1);\n", 'utf8');
+    await writeFile(path.join(root, 'src', 'unrelated.txt'), 'before\n', 'utf8');
+    const current = await services.filesystem.readTextFile({ projectId, permissionSessionId: sessionId, path: 'src/unrelated.txt' });
+    const result = await services.applyVerify.applyAndVerify({
+      projectId,
+      permissionSessionId: sessionId,
+      changes: [{ op: 'replace', path: 'src/unrelated.txt', search: 'before', replacement: 'after', expectedSha256: current.sha256 }],
+      tasks: ['test'],
+    });
+    expect(result.verified).toBe(false);
+    expect(result.verificationStatus).toBe('baseline_accepted');
+    expect(result.acceptedBaselineFailures).toEqual(['test']);
+    expect(result.comparisons[0]).toMatchObject({ task: 'test', acceptedBaselineFailure: true, regression: false });
+    expect(result.rolledBack).toBe(false);
+    expect((await services.filesystem.readTextFile({ projectId, permissionSessionId: sessionId, path: 'src/unrelated.txt' })).content).toBe('after\n');
+  });
+
+  test('keeps a change with explicit deferred verification when no task profile exists', async () => {
+    const current = await services.filesystem.readTextFile({ projectId, permissionSessionId: sessionId, path: 'src/value.txt' });
+    const result = await services.applyVerify.applyAndVerify({
+      projectId,
+      permissionSessionId: sessionId,
+      changes: [{ op: 'replace', path: 'src/value.txt', search: 'good', replacement: 'deferred', expectedSha256: current.sha256 }],
+      tasks: [],
+    });
+    expect(result.verified).toBe(false);
+    expect(result.verificationDeferred).toBe(true);
+    expect(result.verificationStatus).toBe('deferred');
+    expect(result.rolledBack).toBe(false);
+    expect((await services.filesystem.readTextFile({ projectId, permissionSessionId: sessionId, path: 'src/value.txt' })).content).toBe('deferred\n');
   });
 
   test('can intentionally keep a failed change when rollback is disabled', async () => {

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { createRuntimeServices, type RuntimeServices } from '../src/app/runtime-services.js';
+import { configuredBrowserAllowedOrigins } from '../src/app/preview-service.js';
 import { createPermissionSession } from '../src/domain/authorization/permission-session.js';
 import { createProject } from '../src/domain/projects/project.js';
 import { openSqliteDatabase, type SqliteDatabaseHandle } from '../src/infra/sqlite/database.js';
@@ -21,6 +22,7 @@ describe('loopback preview and browser QA', () => {
     workspace = await mkdtemp(path.join(tmpdir(), 'mcp-preview-'));
     root = path.join(workspace, 'project');
     await mkdir(path.join(root, 'scripts'), { recursive: true });
+    await writeFile(path.join(root, 'model.glb'), Buffer.from([0x67, 0x6c, 0x54, 0x46]));
     await writeFile(path.join(root, 'index.html'), `<!doctype html>
       <html><head><title>Preview Fixture</title></head><body>
         <h1>Agentic Preview</h1>
@@ -76,6 +78,9 @@ describe('loopback preview and browser QA', () => {
     expect(await response.text()).toContain('Agentic Preview');
     expect((await fetch(new URL('.env', preview.url))).status).toBe(403);
     expect((await fetch(new URL('credentials.json', preview.url))).status).toBe(403);
+    const modelResponse = await fetch(new URL('model.glb', preview.url));
+    expect(modelResponse.status).toBe(200);
+    expect(modelResponse.headers.get('content-type')).toContain('model/gltf-binary');
 
     const review = await services.previews.review({
       previewId: preview.id,
@@ -92,6 +97,13 @@ describe('loopback preview and browser QA', () => {
     const stopped = await services.previews.stop({ previewId: preview.id });
     expect(stopped.state).toBe('stopped');
   }, 30_000);
+
+  test('parses only explicit trusted-local browser network origins', () => {
+    expect(configuredBrowserAllowedOrigins('https://api.example.com,ws://127.0.0.1:9000;file:///tmp/x;not-a-url')).toEqual([
+      'https://api.example.com',
+      'ws://127.0.0.1:9000',
+    ]);
+  });
 
   test('recognized dev preview binds loopback, becomes reachable, redacts logs and stops the process tree', async () => {
     const preview = await services.previews.start({ projectId, profileId: 'package:dev' });

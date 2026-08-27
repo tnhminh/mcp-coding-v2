@@ -9,7 +9,7 @@ import { killProcessTree, redactProcessOutput, sanitizedEnvironment } from './sa
 import type { ProjectPathResolver } from '../infra/filesystem/project-path-resolver.js';
 
 const MAX_PROCESS_LOG_BYTES = 128 * 1024;
-const PROCESS_SCRIPT = /^(dev|start|serve|preview|storybook|watch)(?::[A-Za-z0-9._-]+)*$/u;
+const PROCESS_SCRIPT = /^(?:dev|start|serve|preview|storybook|watch|web|frontend|backend|server|api|app|local)(?:(?::|[.-])[A-Za-z0-9._-]+)*$/u;
 const packageJsonSchema = z.object({
   packageManager: z.string().optional(),
   scripts: z.record(z.string(), z.string()).optional(),

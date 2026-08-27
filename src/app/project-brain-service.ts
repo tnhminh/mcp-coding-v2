@@ -72,6 +72,10 @@ export interface BrainSummary {
   projectId: string;
   state: 'not_indexed' | 'indexing' | 'ready' | 'failed';
   builtAt: string | null;
+  analysisCoverage: {
+    structural: string[];
+    lexicalOnly: string[];
+  };
   counts: {
     files: number;
     symbols: number;
@@ -88,6 +92,11 @@ interface ParsedFileGraph {
   symbols: BrainSymbol[];
   imports: BrainImport[];
   references: BrainReference[];
+}
+
+interface ImportResolutionConfig {
+  baseUrl: string;
+  paths: Array<{ pattern: string; targets: string[] }>;
 }
 
 function normalized(relativePath: string): string {
@@ -201,13 +210,42 @@ function parseTsJs(relativePath: string, content: string): ParsedFileGraph {
   return { symbols, imports, references };
 }
 
-function resolveImport(fromPath: string, specifier: string, fileSet: Set<string>): string | null {
-  if (!specifier.startsWith('.')) return null;
-  const base = path.posix.normalize(path.posix.join(path.posix.dirname(fromPath), specifier));
-  const candidates = [base];
-  for (const extension of IMPORT_EXTENSIONS) candidates.push(`${base}${extension}`);
-  for (const extension of IMPORT_EXTENSIONS) candidates.push(path.posix.join(base, `index${extension}`));
-  return candidates.find((candidate) => fileSet.has(candidate)) ?? null;
+function importCandidates(base: string): string[] {
+  const normalizedBase = path.posix.normalize(base).replace(/^\.\//u, '');
+  const candidates = [normalizedBase];
+  for (const extension of IMPORT_EXTENSIONS) candidates.push(`${normalizedBase}${extension}`);
+  for (const extension of IMPORT_EXTENSIONS) candidates.push(path.posix.join(normalizedBase, `index${extension}`));
+  return candidates;
+}
+
+function matchPathAlias(specifier: string, pattern: string): string | null {
+  const star = pattern.indexOf('*');
+  if (star < 0) return specifier === pattern ? '' : null;
+  const prefix = pattern.slice(0, star);
+  const suffix = pattern.slice(star + 1);
+  if (!specifier.startsWith(prefix) || !specifier.endsWith(suffix)) return null;
+  return specifier.slice(prefix.length, specifier.length - suffix.length);
+}
+
+function resolveImport(fromPath: string, specifier: string, fileSet: Set<string>, config: ImportResolutionConfig): string | null {
+  if (specifier.startsWith('.')) {
+    const base = path.posix.join(path.posix.dirname(fromPath), specifier);
+    return importCandidates(base).find((candidate) => fileSet.has(candidate)) ?? null;
+  }
+  for (const alias of config.paths) {
+    const wildcard = matchPathAlias(specifier, alias.pattern);
+    if (wildcard === null) continue;
+    for (const target of alias.targets) {
+      const substituted = target.includes('*') ? target.replaceAll('*', wildcard) : target;
+      const base = path.posix.join(config.baseUrl, substituted);
+      const resolved = importCandidates(base).find((candidate) => fileSet.has(candidate));
+      if (resolved) return resolved;
+    }
+  }
+  if (config.baseUrl !== '.') {
+    return importCandidates(path.posix.join(config.baseUrl, specifier)).find((candidate) => fileSet.has(candidate)) ?? null;
+  }
+  return null;
 }
 
 function parsePersistedIndex(indexJson: string, projectId: string): BrainIndex | null {
@@ -226,6 +264,8 @@ function parsePersistedIndex(indexJson: string, projectId: string): BrainIndex |
 
 export class ProjectBrainService {
   private readonly cache = new Map<string, BrainIndex>();
+  private readonly freshnessCheckedAt = new Map<string, number>();
+  private readonly freshnessWindowMs = 1500;
 
   constructor(
     private readonly authorization: AuthorizationService,
@@ -243,6 +283,7 @@ export class ProjectBrainService {
     try {
       const index = await this.scan(request, previous);
       this.cache.set(request.projectId, index);
+      this.freshnessCheckedAt.set(request.projectId, Date.now());
       const now = new Date().toISOString();
       await this.snapshots.save({ projectId: request.projectId, builtAt: index.builtAt, indexJson: JSON.stringify(index), updatedAt: now });
       const latest = await this.projects.findById(request.projectId);
@@ -258,7 +299,8 @@ export class ProjectBrainService {
   async ensureIndex(request: { projectId: string; permissionSessionId?: string }): Promise<BrainIndex> {
     await this.authorization.authorize({ ...request, capability: 'filesystem.read' });
     const existing = await this.loadIndex(request.projectId);
-    if (existing) return existing;
+    const lastChecked = this.freshnessCheckedAt.get(request.projectId) ?? 0;
+    if (existing && Date.now() - lastChecked <= this.freshnessWindowMs) return existing;
     await this.build(request);
     const built = await this.loadIndex(request.projectId);
     if (!built) throw new AppError({ code: 'INTERNAL_ERROR', message: 'Project Brain build did not produce an index.' });
@@ -323,8 +365,10 @@ export class ProjectBrainService {
       const directory = queue.shift();
       if (!directory || visitedDirectories.has(directory)) continue;
       visitedDirectories.add(directory);
-      const entries = await this.filesystem.listFiles({ ...request, path: directory, depth: 0, maxEntries: 500 });
+      const listing = await this.filesystem.listFilesDetailed({ ...request, path: directory, depth: 0, maxEntries: 5000 });
+      const entries = listing.entries;
       discoveredEntries += entries.length;
+      if (listing.truncated) truncated = true;
       for (const entry of entries) {
         if (hasSkippedSegment(entry.path)) continue;
         if (entry.type === 'directory') queue.push(entry.path);
@@ -337,6 +381,7 @@ export class ProjectBrainService {
     }
     if (queue.length > 0) truncated = true;
 
+    const importConfig = await this.importResolutionConfig(request);
     const previousFiles = new Map(previous?.files.map((file) => [file.path, file]) ?? []);
     const previousSymbols = this.groupByPath(previous?.symbols ?? []);
     const previousImports = this.groupByPath(previous?.imports ?? [], 'fromPath');
@@ -381,7 +426,7 @@ export class ProjectBrainService {
     }
 
     const fileSet = new Set(files.map((file) => file.path));
-    for (const item of imports) item.resolvedPath = resolveImport(item.fromPath, item.specifier, fileSet);
+    for (const item of imports) item.resolvedPath = resolveImport(item.fromPath, item.specifier, fileSet, importConfig);
     return {
       projectId: request.projectId,
       builtAt: new Date().toISOString(),
@@ -393,6 +438,27 @@ export class ProjectBrainService {
       configs: files.filter((file) => file.category === 'config').map((file) => file.path),
       stats: { discoveredEntries, indexedFiles: files.length, parsedTsJsFiles, reusedTsJsFiles, truncated },
     };
+  }
+
+  private async importResolutionConfig(request: { projectId: string; permissionSessionId?: string }): Promise<ImportResolutionConfig> {
+    try {
+      const file = await this.filesystem.readTextFile({ ...request, path: 'tsconfig.json' });
+      const parsed = ts.parseConfigFileTextToJson('tsconfig.json', file.content).config as { compilerOptions?: { baseUrl?: unknown; paths?: unknown } } | undefined;
+      const compilerOptions = parsed?.compilerOptions ?? {};
+      const baseUrl = typeof compilerOptions.baseUrl === 'string' ? path.posix.normalize(compilerOptions.baseUrl).replace(/^\.\//u, '') || '.' : '.';
+      const paths: ImportResolutionConfig['paths'] = [];
+      if (compilerOptions.paths && typeof compilerOptions.paths === 'object') {
+        for (const [pattern, value] of Object.entries(compilerOptions.paths as Record<string, unknown>)) {
+          if (!Array.isArray(value)) continue;
+          const targets = value.filter((item): item is string => typeof item === 'string').slice(0, 20);
+          if (targets.length > 0) paths.push({ pattern, targets });
+        }
+      }
+      return { baseUrl, paths: paths.slice(0, 100) };
+    } catch (error) {
+      if (error instanceof AppError && ['PATH_NOT_FOUND', 'FILE_TOO_LARGE', 'SENSITIVE_PATH'].includes(error.code)) return { baseUrl: '.', paths: [] };
+      return { baseUrl: '.', paths: [] };
+    }
   }
 
   private isIndexableEntry(entry: ListedEntry): boolean {
@@ -422,6 +488,10 @@ export class ProjectBrainService {
       projectId: index.projectId,
       state,
       builtAt: index.builtAt,
+      analysisCoverage: {
+        structural: Object.keys(languages).filter((language) => ['typescript', 'typescript-react', 'javascript', 'javascript-react'].includes(language)).sort(),
+        lexicalOnly: Object.keys(languages).filter((language) => !['typescript', 'typescript-react', 'javascript', 'javascript-react'].includes(language)).sort(),
+      },
       counts: { files: index.files.length, symbols: index.symbols.length, imports: index.imports.length, references: index.references.length, tests: index.tests.length, configs: index.configs.length },
       languages,
       stats: index.stats,
@@ -433,6 +503,7 @@ export class ProjectBrainService {
       projectId,
       state,
       builtAt: null,
+      analysisCoverage: { structural: [], lexicalOnly: [] },
       counts: { files: 0, symbols: 0, imports: 0, references: 0, tests: 0, configs: 0 },
       languages: {},
       stats: null,

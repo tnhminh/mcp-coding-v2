@@ -14,15 +14,16 @@ import { killProcessTree, redactProcessOutput, sanitizedEnvironment } from './sa
 import { isSensitiveRelativePath } from './secure-filesystem-service.js';
 import type { ProjectPathResolver } from '../infra/filesystem/project-path-resolver.js';
 
-const MAX_STATIC_ASSET_BYTES = 8 * 1024 * 1024;
+const MAX_STATIC_ASSET_BYTES = 64 * 1024 * 1024;
 const MAX_PREVIEW_LOG_BYTES = 128 * 1024;
-const PREVIEW_START_TIMEOUT_MS = 20_000;
+const PREVIEW_START_TIMEOUT_MS = 90_000;
 const STATIC_EXTENSIONS = new Set([
-  '.html', '.htm', '.css', '.js', '.mjs', '.cjs', '.json', '.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico',
-  '.woff', '.woff2', '.ttf', '.map', '.txt', '.xml', '.webmanifest',
+  '.html', '.htm', '.css', '.js', '.mjs', '.cjs', '.json', '.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.ico',
+  '.woff', '.woff2', '.ttf', '.map', '.txt', '.xml', '.webmanifest', '.glb', '.gltf', '.bin', '.wasm',
+  '.mp4', '.webm', '.mov', '.m4v', '.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.pdf',
 ]);
 const HIDDEN_OR_INTERNAL = new Set(['.git', '.runtime', 'node_modules']);
-const DEV_SCRIPT_NAMES = ['dev', 'start', 'serve', 'preview'] as const;
+const PREVIEW_SCRIPT_NAME = /^(?:dev|start|serve|preview|web|frontend|app)(?:(?::|[.-])[A-Za-z0-9._-]+)*$/u;
 const packageJsonSchema = z.object({
   packageManager: z.string().optional(),
   scripts: z.record(z.string(), z.string()).optional(),
@@ -77,6 +78,7 @@ export interface BrowserReviewResult {
   pageErrors: string[];
   failedRequests: Array<{ url: string; failure: string }>;
   blockedRequests: string[];
+  allowedExternalOrigins: string[];
   actionResults: Array<{ type: BrowserAction['type']; success: boolean; detail: string }>;
   screenshotBase64: string;
 }
@@ -118,6 +120,9 @@ function mimeType(extension: string): string {
     '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
     '.gif': 'image/gif', '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf',
     '.map': 'application/json', '.txt': 'text/plain; charset=utf-8', '.xml': 'application/xml', '.webmanifest': 'application/manifest+json',
+    '.avif': 'image/avif', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.wasm': 'application/wasm',
+    '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime', '.m4v': 'video/x-m4v',
+    '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.flac': 'audio/flac', '.pdf': 'application/pdf',
   };
   return mapping[extension] ?? 'application/octet-stream';
 }
@@ -180,16 +185,41 @@ function packageCommand(manager: PackageManager, script: string, framework: Fram
   return { executable: shell, args: ['/d', '/s', '/c', command], env };
 }
 
+export function configuredBrowserAllowedOrigins(value = process.env.MCP_BROWSER_ALLOWED_ORIGINS): string[] {
+  if (!value?.trim()) return [];
+  const origins = new Set<string>();
+  for (const item of value.split(/[;,]/u).map((candidate) => candidate.trim()).filter(Boolean).slice(0, 20)) {
+    try {
+      const parsed = new URL(item);
+      if (!['http:', 'https:', 'ws:', 'wss:'].includes(parsed.protocol)) continue;
+      origins.add(parsed.origin);
+    } catch { /* invalid trusted-local config entry is ignored */ }
+  }
+  return [...origins].sort();
+}
+
+function samePreviewEndpoint(candidate: URL, baseUrl: URL): boolean {
+  const candidatePort = candidate.port || (['https:', 'wss:'].includes(candidate.protocol) ? '443' : '80');
+  const basePort = baseUrl.port || (baseUrl.protocol === 'https:' ? '443' : '80');
+  return candidate.hostname === baseUrl.hostname && candidatePort === basePort;
+}
+
 function browserExecutablePath(): string | null {
+  const configured = process.env.MCP_BROWSER_EXECUTABLE_PATH?.trim();
+  const localAppData = process.env.LOCALAPPDATA ?? '';
   const candidates = process.platform === 'win32'
     ? [
+        configured,
         'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
         'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
         'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
         'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+        localAppData ? path.join(localAppData, 'Google', 'Chrome', 'Application', 'chrome.exe') : '',
+        localAppData ? path.join(localAppData, 'Microsoft', 'Edge', 'Application', 'msedge.exe') : '',
+        localAppData ? path.join(localAppData, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe') : '',
       ]
-    : ['/usr/bin/microsoft-edge', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'];
-  return candidates.find((candidate) => existsSync(candidate)) ?? null;
+    : [configured, '/usr/bin/microsoft-edge', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/brave-browser'];
+  return candidates.filter((candidate): candidate is string => Boolean(candidate)).find((candidate) => existsSync(candidate)) ?? null;
 }
 
 async function waitForPreview(url: string, preview: InternalPreview): Promise<void> {
@@ -222,7 +252,7 @@ export class PreviewService {
     }
     const metadata = await this.packageMetadata(resolver);
     if (metadata) {
-      for (const script of DEV_SCRIPT_NAMES) {
+      for (const script of Object.keys(metadata.scripts).filter((name) => PREVIEW_SCRIPT_NAME.test(name)).sort()) {
         const body = metadata.scripts[script];
         if (!body) continue;
         const framework = frameworkFor(metadata, body);
@@ -294,6 +324,8 @@ export class PreviewService {
     const browser = await chromium.launch({ executablePath, headless: true, args: ['--disable-extensions', '--disable-background-networking'] });
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, serviceWorkers: 'block' });
     const blockedRequests: string[] = [];
+    const allowedExternalOrigins = configuredBrowserAllowedOrigins();
+    const allowedExternalOriginSet = new Set(allowedExternalOrigins);
     const consoleMessages: Array<{ type: string; text: string }> = [];
     const pageErrors: string[] = [];
     const failedRequests: Array<{ url: string; failure: string }> = [];
@@ -303,7 +335,7 @@ export class PreviewService {
         let parsed: URL;
         try { parsed = new URL(requestUrl); }
         catch { blockedRequests.push(requestUrl); await route.abort('blockedbyclient'); return; }
-        if (['data:', 'blob:'].includes(parsed.protocol) || parsed.origin === baseUrl.origin) {
+        if (['data:', 'blob:'].includes(parsed.protocol) || parsed.origin === baseUrl.origin || allowedExternalOriginSet.has(parsed.origin)) {
           await route.continue();
           return;
         }
@@ -314,7 +346,7 @@ export class PreviewService {
         let parsed: URL;
         try { parsed = new URL(ws.url()); }
         catch { await ws.close({ code: 1008, reason: 'blocked' }); return; }
-        if (parsed.origin === baseUrl.origin) {
+        if (samePreviewEndpoint(parsed, baseUrl) || allowedExternalOriginSet.has(parsed.origin)) {
           ws.connectToServer();
           return;
         }
@@ -376,6 +408,7 @@ export class PreviewService {
         pageErrors,
         failedRequests,
         blockedRequests,
+        allowedExternalOrigins,
         actionResults,
         screenshotBase64,
       };
@@ -500,7 +533,7 @@ export class PreviewService {
     if (!STATIC_EXTENSIONS.has(extension)) throw new AppError({ code: 'SENSITIVE_PATH', message: 'This asset type is not exposed by static preview.', httpStatus: 403, expose: true });
     const info = await stat(resolved.absolutePath);
     if (!info.isFile()) throw new AppError({ code: 'PATH_INVALID', message: 'Preview path must refer to a file.', httpStatus: 400, expose: true });
-    if (info.size > MAX_STATIC_ASSET_BYTES) throw new AppError({ code: 'FILE_TOO_LARGE', message: 'Preview asset exceeds 8 MiB.', httpStatus: 413, expose: true });
+    if (info.size > MAX_STATIC_ASSET_BYTES) throw new AppError({ code: 'FILE_TOO_LARGE', message: 'Preview asset exceeds 64 MiB.', httpStatus: 413, expose: true });
     const body = await readFile(resolved.absolutePath);
     res.writeHead(200, {
       'content-type': mimeType(extension),

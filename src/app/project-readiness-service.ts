@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { z } from 'zod';
 import { AuthorizationService } from './authorization-service.js';
-import { CommandRecipeService, type CommandRecipeResult } from './command-recipe-service.js';
+import { CommandRecipeService, type CommandRecipeId, type CommandRecipeResult } from './command-recipe-service.js';
 import { AppError } from './errors.js';
 import { ProjectPathResolverFactory } from './project-path-resolver-factory.js';
 import { TaskRunnerService, type TaskKind, type TaskRunResult } from './task-runner-service.js';
@@ -33,14 +33,14 @@ export interface ProjectReadinessSnapshot {
   issues: ProjectReadinessIssue[];
   availableTaskIds: TaskKind[];
   recommendedPreparation: Array<
-    | { kind: 'run_recipe'; recipe: 'package.install'; reason: string }
+    | { kind: 'run_recipe'; recipe: CommandRecipeId; reason: string; automatic: boolean }
     | { kind: 'configure_task'; task: TaskKind; reason: string }
   >;
 }
 
 export interface PrepareWorkspaceResult {
   before: ProjectReadinessSnapshot;
-  actions: Array<{ kind: 'package.install'; result: CommandRecipeResult }>;
+  actions: Array<{ kind: 'run_recipe'; recipe: CommandRecipeId; result: CommandRecipeResult }>;
   after: ProjectReadinessSnapshot;
   baseline: TaskRunResult[];
   baselineReady: boolean;
@@ -87,6 +87,7 @@ export class ProjectReadinessService {
           kind: 'run_recipe',
           recipe: 'package.install',
           reason: 'Install declared project dependencies before running package scripts.',
+          automatic: true,
         });
       }
 
@@ -107,6 +108,18 @@ export class ProjectReadinessService {
           reason: 'Next.js lint requires one-time ESLint configuration before autonomous non-interactive verification.',
         });
       }
+    }
+
+    const nonNodePreparations: Array<{ recipe: CommandRecipeId; reason: string; automatic: boolean }> = [
+      { recipe: 'go.mod_download', reason: 'Warm and validate Go module dependencies before verification.', automatic: true },
+      { recipe: 'cargo.fetch', reason: 'Fetch declared Rust dependencies before verification.', automatic: true },
+      { recipe: 'dotnet.restore', reason: 'Restore .NET dependencies before verification.', automatic: true },
+      { recipe: 'python.install_requirements', reason: 'Install Python requirements into the project virtual environment before verification.', automatic: await this.exists(resolver, '.venv') },
+    ];
+    for (const preparation of nonNodePreparations) {
+      const descriptor = recipes.find((recipe) => recipe.id === preparation.recipe);
+      if (!descriptor?.available) continue;
+      recommendedPreparation.push({ kind: 'run_recipe', ...preparation });
     }
 
     return {
@@ -137,9 +150,10 @@ export class ProjectReadinessService {
     const before = await this.inspect(base);
     const actions: PrepareWorkspaceResult['actions'] = [];
 
-    if (before.dependencyState === 'missing') {
-      const result = await this.commandRecipes.runRecipe({ ...base, recipe: 'package.install' });
-      actions.push({ kind: 'package.install', result });
+    for (const preparation of before.recommendedPreparation) {
+      if (preparation.kind !== 'run_recipe' || !preparation.automatic) continue;
+      const result = await this.commandRecipes.runRecipe({ ...base, recipe: preparation.recipe });
+      actions.push({ kind: 'run_recipe', recipe: preparation.recipe, result });
       if (!result.success) {
         const afterFailedInstall = await this.inspect(base);
         return { before, actions, after: afterFailedInstall, baseline: [], baselineReady: false };

@@ -66,13 +66,26 @@ describe('project readiness preflight', () => {
       baselineTasks: ['typecheck'],
     });
     expect(prepared.actions).toHaveLength(1);
-    expect(prepared.actions[0]?.result.success).toBe(true);
+    expect(prepared.actions[0]).toMatchObject({ kind: 'run_recipe', recipe: 'package.install', result: { success: true } });
     expect(prepared.after.dependencyState).toBe('ready');
     expect(prepared.baseline).toEqual([
       expect.objectContaining({ task: 'typecheck', success: true, failureKind: 'none' }),
     ]);
     expect(prepared.baselineReady).toBe(true);
   }, 30_000);
+
+  test('publishes non-Node dependency preparation recipes without forcing unsafe global Python installs', async () => {
+    await rm(path.join(root, 'package.json'));
+    await writeFile(path.join(root, 'go.mod'), 'module example.com/readiness\n\ngo 1.22\n', 'utf8');
+    await writeFile(path.join(root, 'Cargo.toml'), '[package]\nname = "fixture"\nversion = "0.1.0"\n', 'utf8');
+    await writeFile(path.join(root, 'requirements.txt'), 'example-package==1.0.0\n', 'utf8');
+    const snapshot = await services.readiness.inspect({ projectId, permissionSessionId: sessionId });
+    expect(snapshot.recommendedPreparation).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'run_recipe', recipe: 'go.mod_download', automatic: true }),
+      expect.objectContaining({ kind: 'run_recipe', recipe: 'cargo.fetch', automatic: true }),
+      expect.objectContaining({ kind: 'run_recipe', recipe: 'python.install_requirements', automatic: false }),
+    ]));
+  });
 
   test('detects interactive Next lint configuration before an autonomous coding cycle', async () => {
     await writeFile(path.join(root, 'package.json'), JSON.stringify({

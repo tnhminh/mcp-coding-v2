@@ -246,7 +246,7 @@ export function createMcpServer(services?: McpToolServices): McpServer {
   });
 
   server.registerTool('process_profiles', {
-    title: 'List managed process profiles', description: 'Discover safe long-running package scripts such as dev/start/serve/preview/storybook/watch. No caller-controlled raw command is accepted.',
+    title: 'List managed process profiles', description: 'Discover safe long-running managed package scripts such as dev/start/serve/preview/storybook/watch/web/frontend/backend/server/api/app/local variants. No caller-controlled raw command is accepted.',
     inputSchema: z.object(authShape).strict(), annotations: { readOnlyHint: true },
   }, async (input) => { try { return ok({ processProfiles: await services.processes.profiles(authorized(input)) }); } catch (error) { return failed(error); } });
 
@@ -273,7 +273,7 @@ export function createMcpServer(services?: McpToolServices): McpServer {
   }, async (input) => { try { return ok(await services.processes.stop({ ...authorized(input), processId: input.process_id })); } catch (error) { return failed(error); } });
 
   server.registerTool('git_status', {
-    title: 'Git status', description: 'Read structured local Git status only when the repository root exactly matches the registered project root.',
+    title: 'Git status', description: 'Read structured project-scoped Git status, including registered subprojects inside a larger monorepo; Git mutations remain repository-root only.',
     inputSchema: z.object(authShape).strict(), annotations: { readOnlyHint: true },
   }, async (input) => { try { return ok(await services.git.status(authorized(input))); } catch (error) { return failed(error); } });
 
@@ -332,7 +332,7 @@ export function createMcpServer(services?: McpToolServices): McpServer {
   server.registerTool('list_skills', {
     title: 'List project skills', description: 'Discover nested AGENTS, SKILL, prompt and rule files across common coding-agent formats including MCP/Agents/Codex/Claude/GitHub/Cursor/Cline/Roo/Windsurf/Continue.',
     inputSchema: z.object(authShape).strict(), annotations: { readOnlyHint: true },
-  }, async (input) => { try { return ok({ skills: await services.skills.listSkills(authorized(input)) }); } catch (error) { return failed(error); } });
+  }, async (input) => { try { return ok(await services.skills.discoverSkills(authorized(input))); } catch (error) { return failed(error); } });
 
   server.registerTool('read_skill', {
     title: 'Read project skill', description: 'Read one recognized project skill/instruction file.',
@@ -341,13 +341,14 @@ export function createMcpServer(services?: McpToolServices): McpServer {
 
   server.registerTool('project_guidance', {
     title: 'Load project guidance', description: 'Load a bounded bundle of all recognized coding-agent instructions and skills with source/scope metadata. Use before implementation so project rules are not missed.',
-    inputSchema: z.object({ ...authShape, max_bytes: z.number().int().min(1024).max(1024 * 1024).optional() }).strict(),
+    inputSchema: z.object({ ...authShape, max_bytes: z.number().int().min(1024).max(1024 * 1024).optional(), target_paths: z.array(pathSchema).max(20).optional() }).strict(),
     annotations: { readOnlyHint: true },
   }, async (input) => {
     try {
       return ok(await services.skills.guidanceBundle({
         ...authorized(input),
         ...(input.max_bytes === undefined ? {} : { maxBytes: input.max_bytes }),
+        ...(input.target_paths === undefined ? {} : { targetPaths: input.target_paths }),
       }));
     } catch (error) { return failed(error); }
   });
@@ -374,7 +375,7 @@ export function createMcpServer(services?: McpToolServices): McpServer {
 
   server.registerTool('context_bundle', {
     title: 'Retrieve bounded coding context', description: 'Rank graph and literal-text evidence into a bounded source context bundle for coding/review.',
-    inputSchema: z.object({ ...authShape, query: z.string().min(1).max(500), max_files: z.number().int().min(1).max(12).default(8), max_chars: z.number().int().min(2000).max(24000).default(12000) }).strict(), annotations: { readOnlyHint: true },
+    inputSchema: z.object({ ...authShape, query: z.string().min(1).max(2000), max_files: z.number().int().min(1).max(40).default(12), max_chars: z.number().int().min(2000).max(120000).default(24000) }).strict(), annotations: { readOnlyHint: true },
   }, async (input) => { try { return ok(await services.contextImpact.contextBundle({ ...authorized(input), query: input.query, maxFiles: input.max_files, maxChars: input.max_chars })); } catch (error) { return failed(error); } });
 
   server.registerTool('impact_analysis', {
@@ -395,7 +396,7 @@ export function createMcpServer(services?: McpToolServices): McpServer {
       ...authShape,
       objective: z.string().min(1).max(2000),
       changes: z.array(z.discriminatedUnion('op', [replaceChangeSchema, writeChangeSchema])).min(1).max(20),
-      tasks: z.array(taskKindSchema).min(1).max(6),
+      tasks: z.array(taskKindSchema).max(6).default([]),
       review_seeds: z.array(z.string().min(1).max(4096)).max(20).optional(),
       iteration: z.number().int().min(1).max(20).default(1),
       max_iterations: z.number().int().min(1).max(20).default(5),
@@ -530,7 +531,7 @@ export function createMcpServer(services?: McpToolServices): McpServer {
     inputSchema: z.object({
       ...authShape,
       changes: z.array(z.discriminatedUnion('op', [replaceChangeSchema, writeChangeSchema])).min(1).max(20),
-      tasks: z.array(taskKindSchema).min(1).max(6),
+      tasks: z.array(taskKindSchema).max(6).default([]),
       rollback_on_failure: z.boolean().default(true),
     }).strict(),
     annotations: { readOnlyHint: false, destructiveHint: true },
@@ -567,6 +568,18 @@ export function createMcpServer(services?: McpToolServices): McpServer {
     } catch (error) { return failed(error); }
   });
 
+  server.registerTool('read_file_range', {
+    title: 'Read project file range', description: 'Read a bounded line range from a text file up to 16 MiB while preserving SHA-256 concurrency metadata.',
+    inputSchema: z.object({ ...authShape, path: pathSchema, start_line: z.number().int().min(1).default(1), max_lines: z.number().int().min(1).max(2000).default(400), max_bytes: z.number().int().min(1024).max(512 * 1024).default(128 * 1024) }).strict(),
+    annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok(await fs.readTextRange({ ...authorized(input), path: input.path, startLine: input.start_line, maxLines: input.max_lines, maxBytes: input.max_bytes })); } catch (error) { return failed(error); } });
+
+  server.registerTool('replace_file_lines', {
+    title: 'Replace project file lines', description: 'Atomically replace an inclusive line range in a text file up to 16 MiB using the current SHA-256 guard.',
+    inputSchema: z.object({ ...authShape, path: pathSchema, start_line: z.number().int().min(1), end_line: z.number().int().min(1), replacement: z.string().max(1024 * 1024), expected_sha256: shaSchema }).strict(),
+    annotations: { readOnlyHint: false, destructiveHint: true },
+  }, async (input) => { try { return ok(await fs.replaceTextLines({ ...authorized(input), path: input.path, startLine: input.start_line, endLine: input.end_line, replacement: input.replacement, expectedSha256: input.expected_sha256 })); } catch (error) { return failed(error); } });
+
   server.registerTool('stat_path', {
     title: 'Stat project path', description: 'Stat one authorized project path.',
     inputSchema: z.object({ ...authShape, path: pathSchema }).strict(), annotations: { readOnlyHint: true },
@@ -574,15 +587,15 @@ export function createMcpServer(services?: McpToolServices): McpServer {
 
   server.registerTool('list_files', {
     title: 'List project files', description: 'List bounded project entries without following symlinks.',
-    inputSchema: z.object({ ...authShape, path: z.string().max(4096).default('.'), depth: z.number().int().min(0).max(8).default(2), max_entries: z.number().int().min(1).max(500).default(200) }).strict(),
+    inputSchema: z.object({ ...authShape, path: z.string().max(4096).default('.'), depth: z.number().int().min(0).max(12).default(2), max_entries: z.number().int().min(1).max(5000).default(500) }).strict(),
     annotations: { readOnlyHint: true },
-  }, async (input) => { try { return ok({ entries: await fs.listFiles({ ...authorized(input), path: input.path, depth: input.depth, maxEntries: input.max_entries }) }); } catch (error) { return failed(error); } });
+  }, async (input) => { try { return ok(await fs.listFilesDetailed({ ...authorized(input), path: input.path, depth: input.depth, maxEntries: input.max_entries })); } catch (error) { return failed(error); } });
 
   server.registerTool('search_text', {
     title: 'Search project text', description: 'Literal case-insensitive bounded text search inside a project.',
     inputSchema: z.object({ ...authShape, query: z.string().min(1).max(500), path: z.string().max(4096).default('.'), max_results: z.number().int().min(1).max(100).default(50) }).strict(),
     annotations: { readOnlyHint: true },
-  }, async (input) => { try { return ok({ matches: await fs.searchText({ ...authorized(input), query: input.query, path: input.path, maxResults: input.max_results }) }); } catch (error) { return failed(error); } });
+  }, async (input) => { try { return ok(await fs.searchTextDetailed({ ...authorized(input), query: input.query, path: input.path, maxResults: input.max_results })); } catch (error) { return failed(error); } });
 
   server.registerTool('write_file', {
     title: 'Write project file', description: 'Atomically create or replace text. Existing targets require their current SHA-256.',

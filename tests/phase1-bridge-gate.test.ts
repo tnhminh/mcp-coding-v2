@@ -13,6 +13,8 @@ const REQUIRED_PHASE1_TOOLS = [
 
   'read_file',
   'read_files',
+  'read_file_range',
+  'replace_file_lines',
   'stat_path',
   'list_files',
   'search_text',

@@ -138,7 +138,7 @@ export class CommandRecipeService {
       executable: spec.executable,
       args: spec.args,
       cwd: resolver.canonicalRoot,
-      timeoutSeconds: Math.min(Math.max(request.timeoutSeconds ?? 600, 1), 600),
+      timeoutSeconds: Math.min(Math.max(request.timeoutSeconds ?? 900, 1), 3600),
     });
     return { recipe: request.recipe, ...result };
   }
@@ -181,7 +181,13 @@ export class CommandRecipeService {
         }
         return packageCommand(packageMetadata.manager, ['run', script]);
       }
-      case 'python.install_requirements': return { executable: process.platform === 'win32' ? 'python.exe' : 'python3', args: ['-m', 'pip', 'install', '-r', 'requirements.txt'] };
+      case 'python.install_requirements': {
+        const projectVenvPython = process.platform === 'win32' ? '.venv\\Scripts\\python.exe' : '.venv/bin/python';
+        const executable = await this.exists(resolver, projectVenvPython)
+          ? path.join(resolver.canonicalRoot, projectVenvPython)
+          : (process.platform === 'win32' ? 'python.exe' : 'python3');
+        return { executable, args: ['-m', 'pip', 'install', '-r', 'requirements.txt'] };
+      }
       case 'go.mod_download': return { executable: process.platform === 'win32' ? 'go.exe' : 'go', args: ['mod', 'download'] };
       case 'go.generate': return { executable: process.platform === 'win32' ? 'go.exe' : 'go', args: ['generate', './...'] };
       case 'cargo.fetch': return { executable: process.platform === 'win32' ? 'cargo.exe' : 'cargo', args: ['fetch'] };
