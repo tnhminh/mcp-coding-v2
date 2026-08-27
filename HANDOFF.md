@@ -35,6 +35,20 @@ Strict TypeScript / Node ESM. MCP composition lives in `src/app/create-mcp-serve
 - project skill/instruction discovery: list_skills and read_skill
 - structured test/lint/typecheck/check/build/bench runner with command.run authorization, environment/output/time bounds, redaction and process-tree cleanup
 - apply_and_verify orchestration with default rollback on failed verification; real HTTP MCP E2E PASS
+- structured dependency/install/codegen command recipes through the same bounded process runner; no arbitrary caller shell surface
+- coding_cycle bounded IMPLEMENT → TEST → REVIEW/FIX evidence orchestration
+- Auto Task Discovery + Verification Router V2: workspace bootstrap auto-discovers task/preview profiles and publishes fast/release plans. Safe package aliases and Rust/Go/Python/Maven/Gradle/.NET conventions are recognized; static `index.html` projects receive built-in `check` integrity verification. Unavailable task IDs still fail as `VERIFICATION_UNAVAILABLE` before mutation/job-state advance.
+- Agent Capability Enablement P4.5: `project_access_status`, `project_guidance`, `read_files`, nested/common agent instruction discovery, all existing safe-name package.json scripts through structured `package.script`, workspace capability manifest, and exact runtime tool-catalog parity regression.
+- Project Readiness P4.6: `project_readiness` + `prepare_workspace` classify/repair missing dependency artifacts before coding, capture baseline task evidence, expose `failureKind`, and avoid adding legacy static verification when framework/package verifiers already exist.
+- persistent SQLite AI Jobs with explicit transitions, CAS concurrency control, bounded evidence, restart recovery and no persisted permission-session IDs
+- loopback static/recognized dev preview sessions with sensitive-path blocking, health/start/stop and process-tree cleanup
+- browser_review using local Edge/Chrome with same-origin HTTP/WebSocket isolation and DOM/console/network/action/screenshot evidence
+- read-only MCP resource `mcp://server/tool-catalog`; resources/list/read contract PASS for modern + legacy Streamable HTTP clients
+- live compiled localhost restart/smoke PASS on port 7317: health live/ready ok, Control Center HTTP 200, 45 MCP tools visible, `kpi2` static preview/browser review/stop PASS and persistent AI Job create/status/cancel PASS without invoking a source-mutating coding cycle
+- external ChatCode browser engine remains unavailable (`operational=false`) when retried after deploys; fallback Playwright + installed Edge performs live Control Center review automatically
+- real AI Jobs + Workflow Runs Control Center panels backed by persistent SQLite job APIs
+- real Browser / Preview Control Center panel with profile discovery, runtime preview list/start/status/stop and Browser Review DOM/network/screenshot evidence
+- P12-T01/P12-T02 deployed on 7317 and live UI reviewed; favicon 404 and stopped-state display defects found by browser review were fixed and re-reviewed cleanly
 
 - persistent Project Brain with bounded file/language/test/config metadata, TS/JS AST declarations/imports/references and incremental SHA reuse
 - SQLite Brain snapshots survive runtime recreation and corrupted snapshots fail closed
@@ -42,10 +56,10 @@ Strict TypeScript / Node ESM. MCP composition lives in `src/app/create-mcp-serve
 - bounded weighted lexical+graph context retrieval and declaration/reference/importer/related-test impact analysis
 
 ## Current task
-P7-T00 autonomous IMPLEMENT/TEST/REVIEW/FIX coding-cycle orchestration over Brain/Context/Impact + apply_and_verify.
+Agent Harness V1 — build the professional single-agent coding harness over the verified local vibecode capability surface.
 
 ## Next task
-Complete the safe agent-driven coding cycle and evidence contract; richer BM25/Git/task-aware ranking remains later. Git MCP features remain deferred.
+Harness Phase A: persistent Project Execution Context + objective/plan/task decomposition + deterministic tool router. Git/remote/deploy remain deferred until the coding harness is complete.
 
 ## Run/test/build
 `npm install`; `npm run dev:stdio`; `npm run dev:http`; `npm run check`.

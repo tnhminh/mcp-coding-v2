@@ -1,3 +1,4 @@
+import { AuthorizationService } from './authorization-service.js';
 import { AppError } from './errors.js';
 import { SecureFilesystemService, type TextFileResult, type WriteResult } from './secure-filesystem-service.js';
 import { TaskRunnerService, type TaskKind, type TaskRunResult } from './task-runner-service.js';
@@ -44,13 +45,14 @@ function errorSummary(error: unknown): { code: string; message: string } {
 
 export class ApplyVerifyService {
   constructor(
+    private readonly authorization: AuthorizationService,
     private readonly filesystem: SecureFilesystemService,
     private readonly tasks: TaskRunnerService,
   ) {}
 
   async applyAndVerify(request: {
     projectId: string;
-    permissionSessionId: string;
+    permissionSessionId?: string;
     changes: readonly ApplyVerifyChange[];
     tasks: readonly TaskKind[];
     rollbackOnFailure?: boolean;
@@ -69,7 +71,13 @@ export class ApplyVerifyService {
       throw new AppError({ code: 'VALIDATION_ERROR', message: 'Apply+Verify cannot target the same path more than once.', httpStatus: 400, expose: true });
     }
 
-    const base = { projectId: request.projectId, permissionSessionId: request.permissionSessionId };
+    const resolvedSession = await this.authorization.resolvePermissionSession({
+      projectId: request.projectId,
+      ...(request.permissionSessionId === undefined ? {} : { permissionSessionId: request.permissionSessionId }),
+      capabilities: ['filesystem.read', 'filesystem.write', 'command.run'],
+    });
+    const base = { projectId: request.projectId, permissionSessionId: resolvedSession.id };
+    await this.tasks.assertTaskProfilesAvailable({ ...base, tasks: request.tasks });
     const snapshots: Snapshot[] = [];
     for (const change of request.changes) {
       let original: TextFileResult | null;

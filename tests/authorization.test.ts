@@ -96,6 +96,75 @@ describe('authorization foundation', () => {
     await expect(authorization.authorize({ projectId: beta.id, permissionSessionId: sessionB.id, capability: 'command.run' })).rejects.toMatchObject({ code: 'POLICY_DENIED' });
   });
 
+  test('auto-resolves the newest equivalent active session when permission_session_id is omitted', async () => {
+    const project = await addProject('auto');
+    const older = createPermissionSession({
+      projectId: project.id,
+      principalId: 'local-agent',
+      capabilities: ['filesystem.read', 'filesystem.write', 'command.run'],
+      ttlSeconds: 3600,
+    }, { now: new Date('2026-08-26T08:00:00.000Z') });
+    const newer = createPermissionSession({
+      projectId: project.id,
+      principalId: 'local-agent',
+      capabilities: ['command.run', 'filesystem.write', 'filesystem.read'],
+      ttlSeconds: 3600,
+    }, { now: new Date('2026-08-26T08:01:00.000Z') });
+    await sessions.save(older);
+    await sessions.save(newer);
+
+    await expect(authorization.resolvePermissionSession({
+      projectId: project.id,
+      capabilities: ['filesystem.read', 'filesystem.write', 'command.run'],
+      now: new Date('2026-08-26T08:02:00.000Z'),
+    })).resolves.toMatchObject({ id: newer.id });
+  });
+
+  test('omitted permission_session_id fails closed when distinct active authorization envelopes exist', async () => {
+    const project = await addProject('ambiguous');
+    const first = createPermissionSession({ projectId: project.id, principalId: 'agent-a', capabilities: ['filesystem.read'], ttlSeconds: 3600 });
+    const second = createPermissionSession({ projectId: project.id, principalId: 'agent-b', capabilities: ['filesystem.read'], ttlSeconds: 3600 });
+    await sessions.save(first);
+    await sessions.save(second);
+
+    let caught: unknown;
+    try {
+      await authorization.authorize({ projectId: project.id, capability: 'filesystem.read' });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(AppError);
+    if (!(caught instanceof AppError)) throw new Error('Expected AppError');
+    expect(caught.code).toBe('PERMISSION_REQUIRED');
+    expect(caught.message).toContain('Multiple distinct active permission sessions');
+  });
+
+  test('access introspection reports usable, missing, ambiguous and policy-denied capabilities without exposing session ids', async () => {
+    const project = await addProject('inspect');
+    const session = createPermissionSession({
+      projectId: project.id,
+      principalId: 'agent',
+      capabilities: ['filesystem.read', 'filesystem.write', 'command.run'],
+      ttlSeconds: 3600,
+    });
+    await sessions.save(session);
+
+    const snapshot = await authorization.inspectAccess({ projectId: project.id, permissionSessionId: session.id });
+    expect(snapshot.codingEnvelope).toMatchObject({ usable: true, state: 'granted' });
+    expect(snapshot.capabilities).toEqual(expect.arrayContaining([
+      expect.objectContaining({ capability: 'filesystem.read', usable: true, state: 'granted' }),
+      expect.objectContaining({ capability: 'git.read', usable: false, state: 'missing' }),
+    ]));
+    expect(JSON.stringify(snapshot)).not.toContain(session.id);
+
+    await policies.save(createAuthorizationPolicy({ name: 'freeze-commands', projectId: project.id, capability: 'command.run', effect: 'deny' }));
+    const denied = await authorization.inspectAccess({ projectId: project.id, permissionSessionId: session.id });
+    expect(denied.codingEnvelope).toMatchObject({ usable: false, state: 'policy_denied' });
+    expect(denied.capabilities).toEqual(expect.arrayContaining([
+      expect.objectContaining({ capability: 'command.run', usable: false, state: 'policy_denied' }),
+    ]));
+  });
+
   test('inactive projects fail closed even with a valid session', async () => {
     const project = await addProject('alpha');
     await projects.save({ ...project, status: 'inactive', updatedAt: new Date().toISOString() });

@@ -1,5 +1,10 @@
 import { z } from 'zod';
+import type { AiJobService } from './ai-job-service.js';
+import type { AuditUsageService } from './audit-usage-service.js';
 import type { AppConfig } from './config.js';
+import type { PreviewService } from './preview-service.js';
+import type { TunnelIntegrationService } from './tunnel-integration-service.js';
+import type { WindowsAutoStartService } from './windows-autostart-service.js';
 import { AppError } from './errors.js';
 import { HealthService } from './health-service.js';
 import { mcpToolCatalog } from './mcp-tool-catalog.js';
@@ -54,6 +59,56 @@ const updatePolicyInputSchema = z.object({
   reason: z.string().trim().max(500).nullable().optional(),
 }).strict();
 
+const createAiJobInputSchema = z.object({
+  objective: z.string().trim().min(1).max(2000),
+  maxIterations: z.number().int().min(1).max(20).default(5),
+  permissionSessionId: z.string().uuid().optional(),
+}).strict();
+
+const previewStartInputSchema = z.object({
+  profileId: z.string().trim().min(1).max(120),
+  permissionSessionId: z.string().uuid().optional(),
+}).strict();
+
+const browserActionInputSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('click'), selector: z.string().min(1).max(500) }).strict(),
+  z.object({ type: z.literal('click_text'), text: z.string().min(1).max(500) }).strict(),
+  z.object({ type: z.literal('fill'), selector: z.string().min(1).max(500), value: z.string().max(2000) }).strict(),
+  z.object({ type: z.literal('press'), selector: z.string().min(1).max(500), key: z.string().min(1).max(80) }).strict(),
+  z.object({ type: z.literal('wait'), milliseconds: z.number().int().min(0).max(5000) }).strict(),
+]);
+
+const previewReviewInputSchema = z.object({
+  path: z.string().min(1).max(2048).default('/'),
+  actions: z.array(browserActionInputSchema).max(20).default([]),
+  permissionSessionId: z.string().uuid().optional(),
+}).strict();
+
+const tunnelSetupInputSchema = z.object({
+  tunnelId: z.string().trim().regex(/^tunnel_[A-Za-z0-9_-]{8,}$/u),
+  runtimeApiKey: z.string().trim().min(8).max(4096).optional(),
+  autoConnect: z.boolean().default(true),
+}).strict();
+
+const tunnelAutoConnectInputSchema = z.object({ enabled: z.boolean() }).strict();
+
+const llmUsageInputSchema = z.object({
+  source: z.string().trim().min(1).max(80).optional(),
+  actorType: z.string().trim().min(1).max(80).optional(),
+  actorId: z.string().trim().min(1).max(200).nullable().optional(),
+  projectId: z.string().uuid().nullable().optional(),
+  provider: z.string().trim().min(1).max(120),
+  model: z.string().trim().min(1).max(160),
+  operation: z.string().trim().min(1).max(160).optional(),
+  inputTokens: z.number().int().min(0).max(10_000_000_000),
+  outputTokens: z.number().int().min(0).max(10_000_000_000),
+  cachedInputTokens: z.number().int().min(0).max(10_000_000_000).optional(),
+  reasoningTokens: z.number().int().min(0).max(10_000_000_000).optional(),
+  estimatedCostUsd: z.number().min(0).max(1_000_000).nullable().optional(),
+  tokenVisibility: z.enum(['actual', 'estimated']).default('actual'),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+}).strict();
+
 function validationError(error: z.ZodError): AppError {
   return new AppError({
     code: 'VALIDATION_ERROR',
@@ -71,6 +126,11 @@ export class ControlCenterService {
     private readonly projects: ProjectRepository,
     private readonly sessions: PermissionSessionRepository,
     private readonly policies: PolicyRepository,
+    private readonly aiJobs: AiJobService,
+    private readonly previews: PreviewService,
+    private readonly tunnel: TunnelIntegrationService,
+    private readonly autoStart: WindowsAutoStartService,
+    private readonly auditUsage: AuditUsageService,
     private readonly config: AppConfig,
   ) {}
 
@@ -106,8 +166,13 @@ export class ControlCenterService {
       { id: 'filesystem', label: 'Filesystem', state: 'available' },
       { id: 'commands', label: 'Tasks / Commands', state: 'available' },
       { id: 'brain', label: 'Project Brain', state: 'available' },
+      { id: 'jobs', label: 'AI Jobs', state: 'available' },
+      { id: 'workflows', label: 'Workflow Runs', state: 'available' },
+      { id: 'tunnel', label: 'Secure MCP Tunnel', state: 'available' },
+      { id: 'audit', label: 'Audit Log', state: 'available' },
+      { id: 'usage', label: 'Usage', state: 'available' },
       { id: 'git', label: 'Git / GitHub', state: 'planned' },
-      { id: 'browser', label: 'Browser / Preview', state: 'planned' },
+      { id: 'browser', label: 'Browser / Preview', state: 'available' },
       { id: 'remote', label: 'Remote / Deploy', state: 'planned' },
     ];
   }
@@ -262,5 +327,159 @@ export class ControlCenterService {
 
   async removePolicy(id: string): Promise<void> {
     if (!await this.policies.remove(id)) throw new AppError({ code: 'NOT_FOUND', message: 'Policy was not found.', httpStatus: 404, expose: true });
+  }
+
+  async listAiJobs(projectId: string): Promise<Awaited<ReturnType<AiJobService['list']>>> {
+    if (!await this.projects.findById(projectId)) {
+      throw new AppError({ code: 'NOT_FOUND', message: 'Project was not found.', httpStatus: 404, expose: true });
+    }
+    return this.aiJobs.list({ projectId });
+  }
+
+  async createAiJob(projectId: string, input: unknown): Promise<Awaited<ReturnType<AiJobService['create']>>> {
+    if (!await this.projects.findById(projectId)) {
+      throw new AppError({ code: 'NOT_FOUND', message: 'Project was not found.', httpStatus: 404, expose: true });
+    }
+    const parsed = createAiJobInputSchema.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    return this.aiJobs.create({
+      projectId,
+      objective: parsed.data.objective,
+      maxIterations: parsed.data.maxIterations,
+      ...(parsed.data.permissionSessionId === undefined ? {} : { permissionSessionId: parsed.data.permissionSessionId }),
+    });
+  }
+
+  aiJobStatus(id: string): ReturnType<AiJobService['status']> {
+    return this.aiJobs.status({ jobId: id });
+  }
+
+  cancelAiJob(id: string): ReturnType<AiJobService['cancel']> {
+    return this.aiJobs.cancel({ jobId: id });
+  }
+
+  async previewProfiles(projectId: string): Promise<Awaited<ReturnType<PreviewService['profiles']>>> {
+    if (!await this.projects.findById(projectId)) {
+      throw new AppError({ code: 'NOT_FOUND', message: 'Project was not found.', httpStatus: 404, expose: true });
+    }
+    return this.previews.profiles({ projectId });
+  }
+
+  async listPreviews(projectId: string): Promise<Awaited<ReturnType<PreviewService['list']>>> {
+    if (!await this.projects.findById(projectId)) {
+      throw new AppError({ code: 'NOT_FOUND', message: 'Project was not found.', httpStatus: 404, expose: true });
+    }
+    return this.previews.list({ projectId });
+  }
+
+  async startPreview(projectId: string, input: unknown): Promise<Awaited<ReturnType<PreviewService['start']>>> {
+    if (!await this.projects.findById(projectId)) {
+      throw new AppError({ code: 'NOT_FOUND', message: 'Project was not found.', httpStatus: 404, expose: true });
+    }
+    const parsed = previewStartInputSchema.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    return this.previews.start({
+      projectId,
+      profileId: parsed.data.profileId,
+      ...(parsed.data.permissionSessionId === undefined ? {} : { permissionSessionId: parsed.data.permissionSessionId }),
+    });
+  }
+
+  previewStatus(id: string): ReturnType<PreviewService['status']> {
+    return this.previews.status({ previewId: id });
+  }
+
+  stopPreview(id: string): ReturnType<PreviewService['stop']> {
+    return this.previews.stop({ previewId: id });
+  }
+
+  async reviewPreview(id: string, input: unknown): Promise<Awaited<ReturnType<PreviewService['review']>>> {
+    const parsed = previewReviewInputSchema.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    return this.previews.review({
+      previewId: id,
+      path: parsed.data.path,
+      actions: parsed.data.actions,
+      ...(parsed.data.permissionSessionId === undefined ? {} : { permissionSessionId: parsed.data.permissionSessionId }),
+    });
+  }
+
+  tunnelStatus(): ReturnType<TunnelIntegrationService['status']> {
+    return this.tunnel.status();
+  }
+
+  async tunnelSetupStatus(): Promise<{ setup: Awaited<ReturnType<TunnelIntegrationService['setupSnapshot']>>; tunnel: Awaited<ReturnType<TunnelIntegrationService['status']>> }> {
+    return { setup: await this.tunnel.setupSnapshot(), tunnel: await this.tunnel.status() };
+  }
+
+  async tunnelConfigure(input: unknown): Promise<Awaited<ReturnType<TunnelIntegrationService['configureSetup']>>> {
+    const parsed = tunnelSetupInputSchema.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    return this.tunnel.configureSetup({
+      tunnelId: parsed.data.tunnelId,
+      ...(parsed.data.runtimeApiKey === undefined ? {} : { runtimeApiKey: parsed.data.runtimeApiKey }),
+      autoConnect: parsed.data.autoConnect,
+    });
+  }
+
+  async tunnelSetAutoConnect(input: unknown): Promise<Awaited<ReturnType<TunnelIntegrationService['setAutoConnect']>>> {
+    const parsed = tunnelAutoConnectInputSchema.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    return this.tunnel.setAutoConnect(parsed.data.enabled);
+  }
+
+  tunnelClearStoredRuntimeApiKey(): ReturnType<TunnelIntegrationService['clearStoredRuntimeApiKey']> {
+    return this.tunnel.clearStoredRuntimeApiKey();
+  }
+
+  tunnelAutoStartStatus(): ReturnType<WindowsAutoStartService['status']> {
+    return this.autoStart.status();
+  }
+
+  async tunnelSetWindowsAutoStart(input: unknown): Promise<Awaited<ReturnType<WindowsAutoStartService['status']>>> {
+    const parsed = tunnelAutoConnectInputSchema.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    return parsed.data.enabled ? this.autoStart.enable() : this.autoStart.disable();
+  }
+
+  tunnelDoctor(): ReturnType<TunnelIntegrationService['doctor']> {
+    return this.tunnel.doctor();
+  }
+
+  tunnelConnect(): ReturnType<TunnelIntegrationService['connect']> {
+    return this.tunnel.connect();
+  }
+
+  tunnelDisconnect(): ReturnType<TunnelIntegrationService['disconnect']> {
+    return this.tunnel.disconnect();
+  }
+
+  auditEvents(input: { limit?: number; projectId?: string; status?: 'success' | 'failure'; category?: string; query?: string }) {
+    return this.auditUsage.listAudit(input);
+  }
+
+  usageDashboard(input: { days?: number; projectId?: string }) {
+    return this.auditUsage.usageDashboard(input);
+  }
+
+  recordLlmUsage(input: unknown) {
+    const parsed = llmUsageInputSchema.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    return this.auditUsage.recordLlmUsage({
+      provider: parsed.data.provider,
+      model: parsed.data.model,
+      inputTokens: parsed.data.inputTokens,
+      outputTokens: parsed.data.outputTokens,
+      tokenVisibility: parsed.data.tokenVisibility,
+      ...(parsed.data.source === undefined ? {} : { source: parsed.data.source }),
+      ...(parsed.data.actorType === undefined ? {} : { actorType: parsed.data.actorType }),
+      ...(parsed.data.actorId === undefined ? {} : { actorId: parsed.data.actorId }),
+      ...(parsed.data.projectId === undefined ? {} : { projectId: parsed.data.projectId }),
+      ...(parsed.data.operation === undefined ? {} : { operation: parsed.data.operation }),
+      ...(parsed.data.cachedInputTokens === undefined ? {} : { cachedInputTokens: parsed.data.cachedInputTokens }),
+      ...(parsed.data.reasoningTokens === undefined ? {} : { reasoningTokens: parsed.data.reasoningTokens }),
+      ...(parsed.data.estimatedCostUsd === undefined ? {} : { estimatedCostUsd: parsed.data.estimatedCostUsd }),
+      ...(parsed.data.metadata === undefined ? {} : { metadata: parsed.data.metadata }),
+    });
   }
 }

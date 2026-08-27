@@ -69,6 +69,67 @@ describe('structured task runner', () => {
     expect(profiles.map((profile) => profile.id)).not.toContain('build');
   });
 
+  test('auto-discovers safe package script aliases and package manager from lockfile', async () => {
+    await writeFile(path.join(root, 'package.json'), JSON.stringify({ scripts: {
+      'test:unit': 'vitest run',
+      'lint:check': 'eslint .',
+      'type-check': 'tsc --noEmit',
+      verify: 'node scripts/verify.mjs',
+      compile: 'vite build',
+      benchmark: 'node scripts/bench.mjs',
+    } }), 'utf8');
+    await writeFile(path.join(root, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n', 'utf8');
+
+    const profiles = await runner.listTaskProfiles({ projectId, permissionSessionId: sessionId });
+    expect(profiles).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'test', source: 'package.json', discovery: 'alias', executable: 'pnpm', script: 'test:unit', args: ['run', 'test:unit'] }),
+      expect.objectContaining({ id: 'lint', discovery: 'alias', script: 'lint:check' }),
+      expect.objectContaining({ id: 'typecheck', discovery: 'alias', script: 'type-check' }),
+      expect.objectContaining({ id: 'check', discovery: 'alias', script: 'verify' }),
+      expect.objectContaining({ id: 'build', discovery: 'alias', script: 'compile' }),
+      expect.objectContaining({ id: 'bench', discovery: 'alias', script: 'benchmark' }),
+    ]));
+  });
+
+  test('auto-discovers and executes built-in static integrity check without pretending it is a build', async () => {
+    await writeFile(path.join(root, 'index.html'), '<!doctype html><html><head><link rel="stylesheet" href="./app.css"></head><body><script src="app.js"></script></body></html>', 'utf8');
+    await writeFile(path.join(root, 'app.css'), 'body{}\n', 'utf8');
+    await writeFile(path.join(root, 'app.js'), 'console.log("ok");\n', 'utf8');
+
+    const profiles = await runner.listTaskProfiles({ projectId, permissionSessionId: sessionId });
+    expect(profiles).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'check', source: 'builtin-static', discovery: 'builtin', executable: 'builtin:static-check' }),
+    ]));
+    expect(profiles.map((candidate) => candidate.id)).not.toContain('build');
+
+    const passed = await runner.runTask({ projectId, permissionSessionId: sessionId, task: 'check' });
+    expect(passed).toMatchObject({ success: true, source: 'builtin-static', exitCode: 0 });
+    expect(passed.stdout).toContain('checked 2 local asset reference(s)');
+
+    await writeFile(path.join(root, 'index.html'), '<!doctype html><html><body><script src="missing.js"></script></body></html>', 'utf8');
+    const failed = await runner.runTask({ projectId, permissionSessionId: sessionId, task: 'check' });
+    expect(failed).toMatchObject({ success: false, source: 'builtin-static', exitCode: 1 });
+    expect(failed.stderr).toContain('missing.js');
+  });
+
+  test('does not add legacy static check when package/ecosystem verifiers already exist', async () => {
+    await writeFile(path.join(root, 'index.html'), '<!doctype html><html><body>legacy</body></html>', 'utf8');
+    await writeFile(path.join(root, 'package.json'), JSON.stringify({ scripts: { build: 'node -e "process.exit(0)"', typecheck: 'node -e "process.exit(0)"' } }), 'utf8');
+    const profiles = await runner.listTaskProfiles({ projectId, permissionSessionId: sessionId });
+    expect(profiles.map((candidate) => candidate.id)).toEqual(expect.arrayContaining(['typecheck', 'build']));
+    expect(profiles.map((candidate) => candidate.id)).not.toContain('check');
+  });
+
+  test('auto-discovers Maven ecosystem verification profiles from pom.xml', async () => {
+    await writeFile(path.join(root, 'pom.xml'), '<project></project>\n', 'utf8');
+    const profiles = await runner.listTaskProfiles({ projectId, permissionSessionId: sessionId });
+    expect(profiles).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'test', source: 'maven', discovery: 'ecosystem', args: ['test'] }),
+      expect.objectContaining({ id: 'check', source: 'maven', args: ['verify', '-DskipTests=false'] }),
+      expect.objectContaining({ id: 'build', source: 'maven', args: ['package', '-DskipTests'] }),
+    ]));
+  });
+
   test('runs without shell interpolation, drops arbitrary parent env and redacts secret-shaped output', async () => {
     process.env.MCP_RUNNER_SECRET = 'must-not-leak';
     await writeFile(path.join(root, 'scripts', 'test.mjs'), [
@@ -88,6 +149,24 @@ describe('structured task runner', () => {
     expect(result.stdout).toContain('token=[REDACTED]');
     expect(result.stdout).not.toContain('supersecretvalue');
     expect(result.stdout).not.toContain('must-not-leak');
+  });
+
+  test('classifies toolchain/configuration failures separately from source failures', async () => {
+    await writeFile(path.join(root, 'package.json'), JSON.stringify({
+      scripts: { typecheck: 'definitely-missing-tool --noEmit' },
+    }), 'utf8');
+    const missing = await runner.runTask({ projectId, permissionSessionId: sessionId, task: 'typecheck' });
+    expect(missing.success).toBe(false);
+    expect(missing.failureKind).toBe('dependency_missing');
+
+    await writeFile(path.join(root, '.mcp', 'tasks.json'), JSON.stringify({
+      version: 1,
+      profiles: { lint: { executable: 'node', args: ['scripts/config-required.mjs'] } },
+    }), 'utf8');
+    await writeFile(path.join(root, 'scripts', 'config-required.mjs'), "console.error('How would you like to configure ESLint?'); process.exit(1);", 'utf8');
+    const config = await runner.runTask({ projectId, permissionSessionId: sessionId, task: 'lint' });
+    expect(config.success).toBe(false);
+    expect(config.failureKind).toBe('configuration_required');
   });
 
   test('enforces output cap and terminates the task', async () => {

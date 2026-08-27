@@ -17,23 +17,29 @@ function main(): void {
   const database = openSqliteDatabase(databaseFilename);
   const services = createRuntimeServices(database.database, databaseFilename);
   const handle = serveStdio(() => createMcpServer({
+    authorization: services.authorization,
     filesystem: services.filesystem,
     projectDiscovery: services.projectDiscovery,
+    readiness: services.readiness,
     tasks: services.tasks,
+    commandRecipes: services.commandRecipes,
     skills: services.skills,
     workspace: services.workspace,
     applyVerify: services.applyVerify,
     brain: services.brain,
     contextImpact: services.contextImpact,
+    codingCycle: services.codingCycle,
+    aiJobs: services.aiJobs,
+    previews: services.previews,
+    auditUsage: services.auditUsage,
   }), {
-    legacy: 'reject',
     onerror: (error) => logger.error('stdio_transport_failed', error),
   });
   let closed = false;
   const close = async (): Promise<void> => {
     if (closed) return;
     closed = true;
-    await handle.close();
+    await Promise.all([handle.close(), services.previews.closeAll()]);
     database.close();
   };
 

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createServer as createNetServer } from 'node:net';
@@ -38,7 +38,17 @@ describe('Control Center', () => {
 
     const page = await fetch(`http://127.0.0.1:${port}/control-center`);
     expect(page.status).toBe(200);
-    expect(await page.text()).toContain('Control Center');
+    const pageText = await page.text();
+    expect(pageText).toContain('Control Center');
+    expect(pageText).toContain('data-panel="tunnel"');
+    expect(pageText).toContain('id="panel-tunnel"');
+    expect(pageText).toContain('Windows DPAPI');
+    expect(pageText).toContain('Save secure setup');
+    expect(pageText).toContain('data-panel="audit"');
+    expect(pageText).toContain('data-panel="usage"');
+    expect(pageText).toContain('id="panel-audit"');
+    expect(pageText).toContain('id="panel-usage"');
+    expect(pageText).toContain('Known provider token usage and MCP activity');
 
     const overview = await fetch(`http://127.0.0.1:${port}/api/control-center/overview`);
     expect(overview.status).toBe(200);
@@ -47,7 +57,65 @@ describe('Control Center', () => {
     expect(data.modules.find((module) => module.id === 'projects')?.state).toBe('available');
     expect(data.modules.find((module) => module.id === 'permissions')?.state).toBe('available');
     expect(data.modules.find((module) => module.id === 'policies')?.state).toBe('available');
+    expect(data.modules.find((module) => module.id === 'tunnel')?.state).toBe('available');
+    expect(data.modules.find((module) => module.id === 'audit')?.state).toBe('available');
+    expect(data.modules.find((module) => module.id === 'usage')?.state).toBe('available');
+
+    const tunnelResponse = await fetch(`http://127.0.0.1:${port}/api/tunnel/status`);
+    expect(tunnelResponse.status).toBe(200);
+    const tunnelBody = await tunnelResponse.json() as {
+      tunnel: {
+        configuration: { mcpServerUrl: string; tunnelIdConfigured: boolean; runtimeApiKeyConfigured: boolean };
+        localMcp: { reachable: boolean; ready: boolean; httpStatus: number | null };
+      };
+    };
+    expect(tunnelBody.tunnel.configuration.mcpServerUrl).toBe(`http://127.0.0.1:${port}/mcp`);
+    expect(tunnelBody.tunnel.localMcp).toMatchObject({ reachable: true, ready: true, httpStatus: 200 });
+    expect(typeof tunnelBody.tunnel.configuration.tunnelIdConfigured).toBe('boolean');
+    expect(typeof tunnelBody.tunnel.configuration.runtimeApiKeyConfigured).toBe('boolean');
+    if (process.env.CONTROL_PLANE_API_KEY) expect(JSON.stringify(tunnelBody)).not.toContain(process.env.CONTROL_PLANE_API_KEY);
   });
+
+  test('persists secure tunnel setup through Control Center without returning plaintext secrets', async () => {
+    workspace = await mkdtemp(path.join(tmpdir(), 'mcp-cc-tunnel-setup-'));
+    const databasePath = path.join(workspace, 'runtime.sqlite');
+    const port = await reservePort();
+    runtime = await startHttpRuntime(
+      { host: '127.0.0.1', port, logLevel: 'error', databasePath },
+      new JsonLogger('error', () => undefined),
+    );
+
+    const initial = await fetch(`http://127.0.0.1:${port}/api/tunnel/setup`).then((response) => response.json()) as { setup: { tunnelIdConfigured: boolean; runtimeApiKeyConfigured: boolean } };
+    expect(initial.setup).toMatchObject({ tunnelIdConfigured: false, runtimeApiKeyConfigured: false });
+
+    const secret = 'sk-dummy-control-center-secret-123456789';
+    const configuredResponse = await fetch(`http://127.0.0.1:${port}/api/tunnel/setup`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ tunnelId: 'tunnel_abcdefgh12345678', runtimeApiKey: secret, autoConnect: false }),
+    });
+    expect(configuredResponse.status).toBe(process.platform === 'win32' ? 200 : 503);
+    if (process.platform !== 'win32') return;
+
+    const configuredText = await configuredResponse.text();
+    expect(configuredText).not.toContain(secret);
+    const configured = JSON.parse(configuredText) as { setup: { tunnelIdConfigured: boolean; runtimeApiKeyConfigured: boolean; autoConnect: boolean; secretProvider: string } };
+    expect(configured.setup).toMatchObject({ tunnelIdConfigured: true, runtimeApiKeyConfigured: true, autoConnect: false, secretProvider: 'windows-dpapi-current-user' });
+
+    const settingsText = await readFile(path.join(workspace, 'tunnel', 'setup.json'), 'utf8');
+    const encryptedText = await readFile(path.join(workspace, 'tunnel', 'runtime-api-key.dpapi'), 'utf8');
+    expect(settingsText).toContain('tunnel_abcdefgh12345678');
+    expect(settingsText).not.toContain(secret);
+    expect(encryptedText).not.toContain(secret);
+
+    await runtime.close();
+    runtime = await startHttpRuntime(
+      { host: '127.0.0.1', port, logLevel: 'error', databasePath },
+      new JsonLogger('error', () => undefined),
+    );
+    const restored = await fetch(`http://127.0.0.1:${port}/api/tunnel/setup`).then((response) => response.json()) as { setup: { tunnelIdConfigured: boolean; runtimeApiKeyConfigured: boolean; autoConnect: boolean }; tunnel: { configuration: { tunnelIdConfigured: boolean; runtimeApiKeyConfigured: boolean; autoConnect: boolean } } };
+    expect(restored.setup).toMatchObject({ tunnelIdConfigured: true, runtimeApiKeyConfigured: true, autoConnect: false });
+    expect(restored.tunnel.configuration).toMatchObject({ tunnelIdConfigured: true, runtimeApiKeyConfigured: true, autoConnect: false });
+  }, 20_000);
 
   test('creates permission sessions and policies through human-facing CMS APIs', async () => {
     workspace = await mkdtemp(path.join(tmpdir(), 'mcp-cc-auth-'));
@@ -136,4 +204,99 @@ describe('Control Center', () => {
     expect(removed.status).toBe(200);
     expect((await fetch(`http://127.0.0.1:${port}/api/projects`).then((response) => response.json()) as { projects: unknown[] }).projects).toHaveLength(0);
   });
+
+  test('operates persistent AI jobs and workflow state through real Control Center APIs', async () => {
+    workspace = await mkdtemp(path.join(tmpdir(), 'mcp-cc-jobs-'));
+    const projectRoot = path.join(workspace, 'job-project');
+    await mkdir(projectRoot, { recursive: true });
+    const port = await reservePort();
+    runtime = await startHttpRuntime(
+      { host: '127.0.0.1', port, logLevel: 'error', databasePath: ':memory:' },
+      new JsonLogger('error', () => undefined),
+    );
+
+    const projectResponse = await fetch(`http://127.0.0.1:${port}/api/projects`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Job Project', alias: 'job-project', rootPath: projectRoot }),
+    });
+    const project = (await projectResponse.json() as { project: { id: string } }).project;
+    const sessionResponse = await fetch(`http://127.0.0.1:${port}/api/projects/${project.id}/permission-sessions`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ principalId: 'control-center-agent', capabilities: ['filesystem.read', 'filesystem.write', 'command.run'], ttlSeconds: 3600 }),
+    });
+    expect(sessionResponse.status).toBe(201);
+
+    const created = await fetch(`http://127.0.0.1:${port}/api/projects/${project.id}/ai-jobs`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ objective: 'Keep this objective persistent for workflow operations.', maxIterations: 4 }),
+    });
+    expect(created.status).toBe(201);
+    const job = (await created.json() as { job: { id: string; status: string; maxIterations: number } }).job;
+    expect(job).toMatchObject({ status: 'queued', maxIterations: 4 });
+
+    const listed = await fetch(`http://127.0.0.1:${port}/api/projects/${project.id}/ai-jobs`);
+    const jobs = (await listed.json() as { jobs: Array<{ id: string }> }).jobs;
+    expect(jobs.map((candidate) => candidate.id)).toContain(job.id);
+
+    const status = await fetch(`http://127.0.0.1:${port}/api/ai-jobs/${job.id}`);
+    expect((await status.json() as { job: { status: string; iteration: number } }).job).toMatchObject({ status: 'queued', iteration: 0 });
+
+    const cancelled = await fetch(`http://127.0.0.1:${port}/api/ai-jobs/${job.id}/cancel`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+    });
+    expect((await cancelled.json() as { job: { status: string } }).job.status).toBe('cancelled');
+  });
+
+  test('operates preview lifecycle and browser QA through Control Center APIs', async () => {
+    workspace = await mkdtemp(path.join(tmpdir(), 'mcp-cc-preview-'));
+    const projectRoot = path.join(workspace, 'preview-project');
+    await mkdir(projectRoot, { recursive: true });
+    await writeFile(path.join(projectRoot, 'index.html'), '<!doctype html><html><head><title>Control Preview</title></head><body><h1>Preview QA</h1><button>Ready</button></body></html>', 'utf8');
+    const port = await reservePort();
+    runtime = await startHttpRuntime(
+      { host: '127.0.0.1', port, logLevel: 'error', databasePath: ':memory:' },
+      new JsonLogger('error', () => undefined),
+    );
+
+    const projectResponse = await fetch(`http://127.0.0.1:${port}/api/projects`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Preview Project', alias: 'preview-project', rootPath: projectRoot }),
+    });
+    const project = (await projectResponse.json() as { project: { id: string } }).project;
+    expect((await fetch(`http://127.0.0.1:${port}/api/projects/${project.id}/permission-sessions`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ principalId: 'preview-control-agent', capabilities: ['filesystem.read', 'filesystem.write', 'command.run'], ttlSeconds: 3600 }),
+    })).status).toBe(201);
+
+    const profilesResponse = await fetch(`http://127.0.0.1:${port}/api/projects/${project.id}/preview-profiles`);
+    const profiles = (await profilesResponse.json() as { previewProfiles: Array<{ id: string }> }).previewProfiles;
+    expect(profiles.map((profile) => profile.id)).toContain('static');
+
+    const startedResponse = await fetch(`http://127.0.0.1:${port}/api/projects/${project.id}/previews`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ profileId: 'static' }),
+    });
+    expect(startedResponse.status).toBe(201);
+    const preview = (await startedResponse.json() as { preview: { id: string; state: string; url: string } }).preview;
+    expect(preview.state).toBe('running');
+    expect(preview.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/$/u);
+
+    const previewsResponse = await fetch(`http://127.0.0.1:${port}/api/projects/${project.id}/previews`);
+    const previews = (await previewsResponse.json() as { previews: Array<{ id: string }> }).previews;
+    expect(previews.map((item) => item.id)).toContain(preview.id);
+
+    const reviewResponse = await fetch(`http://127.0.0.1:${port}/api/previews/${preview.id}/review`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: '/', actions: [] }),
+    });
+    expect(reviewResponse.status).toBe(200);
+    const review = (await reviewResponse.json() as { review: { title: string; httpStatus: number; screenshotBase64: string; pageErrors: string[] } }).review;
+    expect(review).toMatchObject({ title: 'Control Preview', httpStatus: 200, pageErrors: [] });
+    expect(review.screenshotBase64.length).toBeGreaterThan(1000);
+
+    const stoppedResponse = await fetch(`http://127.0.0.1:${port}/api/previews/${preview.id}/stop`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+    });
+    expect((await stoppedResponse.json() as { preview: { state: string } }).preview.state).toBe('stopped');
+    const statusResponse = await fetch(`http://127.0.0.1:${port}/api/previews/${preview.id}`);
+    expect((await statusResponse.json() as { preview: { state: string } }).preview.state).toBe('stopped');
+  }, 30_000);
 });

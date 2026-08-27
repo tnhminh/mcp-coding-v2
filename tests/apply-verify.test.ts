@@ -71,6 +71,17 @@ describe('apply + verify orchestration', () => {
     expect((await services.filesystem.readTextFile({ projectId, permissionSessionId: sessionId, path: 'src/value.txt' })).content).toBe('good\n');
   });
 
+  test('rejects unavailable verification profiles before mutating project files', async () => {
+    const current = await services.filesystem.readTextFile({ projectId, permissionSessionId: sessionId, path: 'src/value.txt' });
+    await expect(services.applyVerify.applyAndVerify({
+      projectId,
+      permissionSessionId: sessionId,
+      changes: [{ op: 'replace', path: 'src/value.txt', search: 'good', replacement: 'bad', expectedSha256: current.sha256 }],
+      tasks: ['build'],
+    })).rejects.toMatchObject({ code: 'VERIFICATION_UNAVAILABLE' });
+    expect((await services.filesystem.readTextFile({ projectId, permissionSessionId: sessionId, path: 'src/value.txt' })).content).toBe('good\n');
+  });
+
   test('rolls an existing file back when verification fails', async () => {
     const current = await services.filesystem.readTextFile({ projectId, permissionSessionId: sessionId, path: 'src/value.txt' });
     const result = await services.applyVerify.applyAndVerify({

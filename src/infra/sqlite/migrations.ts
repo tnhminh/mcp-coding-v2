@@ -73,6 +73,77 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX idx_project_brain_snapshots_built_at ON project_brain_snapshots(built_at DESC);
     `,
   },
+  {
+    id: '004_ai_jobs',
+    sql: `
+      CREATE TABLE ai_jobs (
+        id TEXT PRIMARY KEY NOT NULL,
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        objective TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'awaiting_fix', 'awaiting_review', 'completed', 'stopped', 'failed', 'cancelled')),
+        iteration INTEGER NOT NULL CHECK (iteration >= 0 AND iteration <= 20),
+        max_iterations INTEGER NOT NULL CHECK (max_iterations >= 1 AND max_iterations <= 20),
+        evidence_json TEXT NOT NULL DEFAULT '[]',
+        review_summary TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_ai_jobs_project_updated ON ai_jobs(project_id, updated_at DESC);
+      CREATE INDEX idx_ai_jobs_status ON ai_jobs(status, updated_at DESC);
+    `,
+  },
+  {
+    id: '005_audit_usage',
+    sql: `
+      CREATE TABLE audit_events (
+        id TEXT PRIMARY KEY NOT NULL,
+        occurred_at TEXT NOT NULL,
+        category TEXT NOT NULL,
+        action TEXT NOT NULL,
+        actor_type TEXT NOT NULL,
+        actor_id TEXT,
+        project_id TEXT,
+        resource_type TEXT,
+        resource_id TEXT,
+        status TEXT NOT NULL CHECK (status IN ('success', 'failure')),
+        duration_ms INTEGER,
+        error_code TEXT,
+        metadata_json TEXT NOT NULL DEFAULT '{}'
+      );
+
+      CREATE INDEX idx_audit_events_time ON audit_events(occurred_at DESC);
+      CREATE INDEX idx_audit_events_project_time ON audit_events(project_id, occurred_at DESC);
+      CREATE INDEX idx_audit_events_action ON audit_events(action, occurred_at DESC);
+      CREATE INDEX idx_audit_events_status ON audit_events(status, occurred_at DESC);
+
+      CREATE TABLE usage_events (
+        id TEXT PRIMARY KEY NOT NULL,
+        occurred_at TEXT NOT NULL,
+        source TEXT NOT NULL,
+        actor_type TEXT NOT NULL,
+        actor_id TEXT,
+        project_id TEXT,
+        provider TEXT,
+        model TEXT,
+        operation TEXT NOT NULL,
+        request_count INTEGER NOT NULL DEFAULT 1 CHECK (request_count >= 1),
+        input_tokens INTEGER,
+        output_tokens INTEGER,
+        cached_input_tokens INTEGER,
+        reasoning_tokens INTEGER,
+        total_tokens INTEGER,
+        estimated_cost_usd REAL,
+        token_visibility TEXT NOT NULL CHECK (token_visibility IN ('actual', 'estimated', 'unavailable')),
+        metadata_json TEXT NOT NULL DEFAULT '{}'
+      );
+
+      CREATE INDEX idx_usage_events_time ON usage_events(occurred_at DESC);
+      CREATE INDEX idx_usage_events_project_time ON usage_events(project_id, occurred_at DESC);
+      CREATE INDEX idx_usage_events_model_time ON usage_events(provider, model, occurred_at DESC);
+      CREATE INDEX idx_usage_events_visibility ON usage_events(token_visibility, occurred_at DESC);
+    `,
+  },
 ];
 
 export function applyMigrations(database: Database.Database): string[] {

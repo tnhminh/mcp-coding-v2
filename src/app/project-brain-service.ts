@@ -234,7 +234,7 @@ export class ProjectBrainService {
     private readonly snapshots: BrainSnapshotRepository,
   ) {}
 
-  async build(request: { projectId: string; permissionSessionId: string }): Promise<BrainSummary> {
+  async build(request: { projectId: string; permissionSessionId?: string }): Promise<BrainSummary> {
     await this.authorization.authorize({ ...request, capability: 'filesystem.read' });
     const project = await this.projects.findById(request.projectId);
     if (!project) throw new AppError({ code: 'NOT_FOUND', message: 'Project was not found.', httpStatus: 404, expose: true });
@@ -255,7 +255,7 @@ export class ProjectBrainService {
     }
   }
 
-  async ensureIndex(request: { projectId: string; permissionSessionId: string }): Promise<BrainIndex> {
+  async ensureIndex(request: { projectId: string; permissionSessionId?: string }): Promise<BrainIndex> {
     await this.authorization.authorize({ ...request, capability: 'filesystem.read' });
     const existing = await this.loadIndex(request.projectId);
     if (existing) return existing;
@@ -265,7 +265,7 @@ export class ProjectBrainService {
     return built;
   }
 
-  async status(request: { projectId: string; permissionSessionId: string }): Promise<BrainSummary> {
+  async status(request: { projectId: string; permissionSessionId?: string }): Promise<BrainSummary> {
     await this.authorization.authorize({ ...request, capability: 'filesystem.read' });
     const project = await this.projects.findById(request.projectId);
     if (!project) throw new AppError({ code: 'NOT_FOUND', message: 'Project was not found.', httpStatus: 404, expose: true });
@@ -275,7 +275,7 @@ export class ProjectBrainService {
     return this.emptySummary(request.projectId, 'not_indexed');
   }
 
-  async findSymbols(request: { projectId: string; permissionSessionId: string; query: string; maxResults?: number }): Promise<BrainSymbol[]> {
+  async findSymbols(request: { projectId: string; permissionSessionId?: string; query: string; maxResults?: number }): Promise<BrainSymbol[]> {
     const query = request.query.trim().toLowerCase();
     if (!query) throw new AppError({ code: 'VALIDATION_ERROR', message: 'Symbol query is required.', httpStatus: 400, expose: true });
     const index = await this.ensureIndex(request);
@@ -286,7 +286,7 @@ export class ProjectBrainService {
       .slice(0, limit);
   }
 
-  async references(request: { projectId: string; permissionSessionId: string; symbol: string; maxResults?: number }): Promise<BrainReference[]> {
+  async references(request: { projectId: string; permissionSessionId?: string; symbol: string; maxResults?: number }): Promise<BrainReference[]> {
     const symbol = request.symbol.trim();
     if (!symbol) throw new AppError({ code: 'VALIDATION_ERROR', message: 'Reference symbol is required.', httpStatus: 400, expose: true });
     const index = await this.ensureIndex(request);
@@ -294,7 +294,7 @@ export class ProjectBrainService {
     return index.references.filter((reference) => reference.name === symbol).slice(0, limit);
   }
 
-  async index(request: { projectId: string; permissionSessionId: string }): Promise<BrainIndex> {
+  async index(request: { projectId: string; permissionSessionId?: string }): Promise<BrainIndex> {
     return this.ensureIndex(request);
   }
 
@@ -312,7 +312,7 @@ export class ProjectBrainService {
     return parsed;
   }
 
-  private async scan(request: { projectId: string; permissionSessionId: string }, previous?: BrainIndex): Promise<BrainIndex> {
+  private async scan(request: { projectId: string; permissionSessionId?: string }, previous?: BrainIndex): Promise<BrainIndex> {
     const queue = ['.'];
     const visitedDirectories = new Set<string>();
     const candidateFiles: string[] = [];

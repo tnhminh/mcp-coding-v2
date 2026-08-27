@@ -9,6 +9,9 @@ import { AppError, toPublicError } from '../app/errors.js';
 import { createMcpServer } from '../app/create-mcp-server.js';
 import { createRuntimeServices } from '../app/runtime-services.js';
 import { HealthService } from '../app/health-service.js';
+import { TunnelIntegrationService } from '../app/tunnel-integration-service.js';
+import { TunnelSetupStore } from '../app/tunnel-setup-store.js';
+import { WindowsAutoStartService } from '../app/windows-autostart-service.js';
 import { controlCenterCss, controlCenterHtml, controlCenterJs } from '../control-center/ui.js';
 import { JsonLogger } from '../infra/json-logger.js';
 import { openSqliteDatabase } from '../infra/sqlite/database.js';
@@ -51,18 +54,42 @@ export async function startHttpRuntime(config: AppConfig, logger: JsonLogger): P
   if (databaseFilename !== ':memory:') await mkdir(path.dirname(databaseFilename), { recursive: true });
   const database = openSqliteDatabase(databaseFilename);
   const services = createRuntimeServices(database.database, databaseFilename);
-  const controlCenter = new ControlCenterService(services.projects, services.permissionSessions, services.policies, { ...config, databasePath: databaseFilename });
+  const tunnelSetupStore = databaseFilename === ':memory:' ? null : new TunnelSetupStore(path.dirname(databaseFilename));
+  const tunnelEnv: NodeJS.ProcessEnv = { ...process.env };
+  if (tunnelSetupStore) {
+    const persisted = await tunnelSetupStore.snapshot();
+    if (!tunnelEnv.CONTROL_PLANE_TUNNEL_ID && persisted.tunnelId) tunnelEnv.CONTROL_PLANE_TUNNEL_ID = persisted.tunnelId;
+    if (!tunnelEnv.CONTROL_PLANE_API_KEY && persisted.runtimeApiKeyConfigured) {
+      const storedKey = await tunnelSetupStore.runtimeApiKey();
+      if (storedKey) tunnelEnv.CONTROL_PLANE_API_KEY = storedKey;
+    }
+    if (!tunnelEnv.MCP_TUNNEL_AUTO_CONNECT && persisted.autoConnect) tunnelEnv.MCP_TUNNEL_AUTO_CONNECT = '1';
+  }
+  const tunnel = new TunnelIntegrationService({ host: config.host, port: config.port, env: tunnelEnv, ...(tunnelSetupStore ? { setupStore: tunnelSetupStore } : {}) });
+  const autoStart = new WindowsAutoStartService({
+    projectRoot: process.cwd(),
+    runtimeRoot: databaseFilename === ':memory:' ? path.resolve('.runtime') : path.dirname(databaseFilename),
+    host: config.host,
+    port: config.port,
+  });
+  const controlCenter = new ControlCenterService(services.projects, services.permissionSessions, services.policies, services.aiJobs, services.previews, tunnel, autoStart, services.auditUsage, { ...config, databasePath: databaseFilename });
   const mcpHandler = createMcpHandler(() => createMcpServer({
+    authorization: services.authorization,
     filesystem: services.filesystem,
     projectDiscovery: services.projectDiscovery,
+    readiness: services.readiness,
     tasks: services.tasks,
+    commandRecipes: services.commandRecipes,
     skills: services.skills,
     workspace: services.workspace,
     applyVerify: services.applyVerify,
     brain: services.brain,
     contextImpact: services.contextImpact,
+    codingCycle: services.codingCycle,
+    aiJobs: services.aiJobs,
+    previews: services.previews,
+    auditUsage: services.auditUsage,
   }), {
-    legacy: 'reject',
     onerror: (error) => logger.error('mcp_request_failed', error),
   });
   const handleMcp = toNodeHandler(mcpHandler, {
@@ -102,6 +129,23 @@ export async function startHttpRuntime(config: AppConfig, logger: JsonLogger): P
 
     if (pathname.startsWith('/api/')) {
       if (!validateHost(req, res) || !validateOrigin(req, res)) return;
+      const auditStarted = Date.now();
+      const mutationMethod = req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE';
+      if (mutationMethod) {
+        res.once('finish', () => {
+          const projectId = /^\/api\/projects\/([^/]+)/u.exec(pathname)?.[1];
+          services.auditUsage.recordAudit({
+            category: 'control_center_api',
+            action: `${req.method ?? 'UNKNOWN'} ${pathname}`,
+            actorType: 'local_control_center',
+            ...(projectId ? { projectId: decodeURIComponent(projectId) } : {}),
+            status: res.statusCode >= 400 ? 'failure' : 'success',
+            durationMs: Date.now() - auditStarted,
+            ...(res.statusCode >= 400 ? { errorCode: `HTTP_${res.statusCode}` } : {}),
+            metadata: { localOnly: true },
+          });
+        });
+      }
       if (pathname === '/api/control-center/overview' && req.method === 'GET') {
         writeJson(res, 200, await controlCenter.overview());
         return;
@@ -166,6 +210,122 @@ export async function startHttpRuntime(config: AppConfig, logger: JsonLogger): P
           return;
         }
       }
+      const projectJobsMatch = /^\/api\/projects\/([^/]+)\/ai-jobs$/u.exec(pathname);
+      if (projectJobsMatch) {
+        const projectId = decodeURIComponent(projectJobsMatch[1] ?? '');
+        if (req.method === 'GET') {
+          writeJson(res, 200, { jobs: await controlCenter.listAiJobs(projectId) });
+          return;
+        }
+        if (req.method === 'POST') {
+          writeJson(res, 201, { job: await controlCenter.createAiJob(projectId, await readJsonBody(req)) });
+          return;
+        }
+      }
+      const aiJobMatch = /^\/api\/ai-jobs\/([^/]+)$/u.exec(pathname);
+      if (aiJobMatch && req.method === 'GET') {
+        writeJson(res, 200, { job: await controlCenter.aiJobStatus(decodeURIComponent(aiJobMatch[1] ?? '')) });
+        return;
+      }
+      const cancelAiJobMatch = /^\/api\/ai-jobs\/([^/]+)\/cancel$/u.exec(pathname);
+      if (cancelAiJobMatch && req.method === 'POST') {
+        writeJson(res, 200, { job: await controlCenter.cancelAiJob(decodeURIComponent(cancelAiJobMatch[1] ?? '')) });
+        return;
+      }
+      const previewProfilesMatch = /^\/api\/projects\/([^/]+)\/preview-profiles$/u.exec(pathname);
+      if (previewProfilesMatch && req.method === 'GET') {
+        writeJson(res, 200, { previewProfiles: await controlCenter.previewProfiles(decodeURIComponent(previewProfilesMatch[1] ?? '')) });
+        return;
+      }
+      const projectPreviewsMatch = /^\/api\/projects\/([^/]+)\/previews$/u.exec(pathname);
+      if (projectPreviewsMatch) {
+        const projectId = decodeURIComponent(projectPreviewsMatch[1] ?? '');
+        if (req.method === 'GET') {
+          writeJson(res, 200, { previews: await controlCenter.listPreviews(projectId) });
+          return;
+        }
+        if (req.method === 'POST') {
+          writeJson(res, 201, { preview: await controlCenter.startPreview(projectId, await readJsonBody(req)) });
+          return;
+        }
+      }
+      const previewMatch = /^\/api\/previews\/([^/]+)$/u.exec(pathname);
+      if (previewMatch && req.method === 'GET') {
+        writeJson(res, 200, { preview: await controlCenter.previewStatus(decodeURIComponent(previewMatch[1] ?? '')) });
+        return;
+      }
+      const stopPreviewMatch = /^\/api\/previews\/([^/]+)\/stop$/u.exec(pathname);
+      if (stopPreviewMatch && req.method === 'POST') {
+        writeJson(res, 200, { preview: await controlCenter.stopPreview(decodeURIComponent(stopPreviewMatch[1] ?? '')) });
+        return;
+      }
+      const reviewPreviewMatch = /^\/api\/previews\/([^/]+)\/review$/u.exec(pathname);
+      if (reviewPreviewMatch && req.method === 'POST') {
+        writeJson(res, 200, { review: await controlCenter.reviewPreview(decodeURIComponent(reviewPreviewMatch[1] ?? ''), await readJsonBody(req)) });
+        return;
+      }
+      if (pathname === '/api/tunnel/status' && req.method === 'GET') {
+        writeJson(res, 200, { tunnel: await controlCenter.tunnelStatus() });
+        return;
+      }
+      if (pathname === '/api/tunnel/setup' && req.method === 'GET') {
+        writeJson(res, 200, await controlCenter.tunnelSetupStatus());
+        return;
+      }
+      if (pathname === '/api/tunnel/setup' && req.method === 'PUT') {
+        writeJson(res, 200, await controlCenter.tunnelConfigure(await readJsonBody(req)));
+        return;
+      }
+      if (pathname === '/api/tunnel/auto-connect' && req.method === 'PUT') {
+        writeJson(res, 200, await controlCenter.tunnelSetAutoConnect(await readJsonBody(req)));
+        return;
+      }
+      if (pathname === '/api/tunnel/windows-autostart' && req.method === 'GET') {
+        writeJson(res, 200, { autoStart: await controlCenter.tunnelAutoStartStatus() });
+        return;
+      }
+      if (pathname === '/api/tunnel/windows-autostart' && req.method === 'PUT') {
+        writeJson(res, 200, { autoStart: await controlCenter.tunnelSetWindowsAutoStart(await readJsonBody(req)) });
+        return;
+      }
+      if (pathname === '/api/tunnel/runtime-api-key' && req.method === 'DELETE') {
+        writeJson(res, 200, await controlCenter.tunnelClearStoredRuntimeApiKey());
+        return;
+      }
+      if (pathname === '/api/tunnel/doctor' && req.method === 'POST') {
+        writeJson(res, 200, { doctor: await controlCenter.tunnelDoctor() });
+        return;
+      }
+      if (pathname === '/api/tunnel/connect' && req.method === 'POST') {
+        writeJson(res, 200, { tunnel: await controlCenter.tunnelConnect() });
+        return;
+      }
+      if (pathname === '/api/tunnel/disconnect' && req.method === 'POST') {
+        writeJson(res, 200, { tunnel: await controlCenter.tunnelDisconnect() });
+        return;
+      }
+      if (pathname === '/api/audit' && req.method === 'GET') {
+        const limitText = requestUrl.searchParams.get('limit');
+        const statusText = requestUrl.searchParams.get('status');
+        const category = requestUrl.searchParams.get('category') ?? undefined;
+        const projectId = requestUrl.searchParams.get('project_id') ?? undefined;
+        const query = requestUrl.searchParams.get('q') ?? undefined;
+        const limit = limitText === null ? undefined : Number(limitText);
+        const status = statusText === 'success' || statusText === 'failure' ? statusText : undefined;
+        writeJson(res, 200, { auditEvents: controlCenter.auditEvents({ ...(limit === undefined ? {} : { limit }), ...(status === undefined ? {} : { status }), ...(category === undefined ? {} : { category }), ...(projectId === undefined ? {} : { projectId }), ...(query === undefined ? {} : { query }) }) });
+        return;
+      }
+      if (pathname === '/api/usage' && req.method === 'GET') {
+        const daysText = requestUrl.searchParams.get('days');
+        const days = daysText === null ? undefined : Number(daysText);
+        const projectId = requestUrl.searchParams.get('project_id') ?? undefined;
+        writeJson(res, 200, { usage: controlCenter.usageDashboard({ ...(days === undefined ? {} : { days }), ...(projectId === undefined ? {} : { projectId }) }) });
+        return;
+      }
+      if (pathname === '/api/usage/llm' && req.method === 'POST') {
+        writeJson(res, 201, { usageEvent: controlCenter.recordLlmUsage(await readJsonBody(req)) });
+        return;
+      }
       if (pathname === '/api/settings' && req.method === 'GET') {
         writeJson(res, 200, controlCenter.settings());
         return;
@@ -206,12 +366,18 @@ export async function startHttpRuntime(config: AppConfig, logger: JsonLogger): P
       });
     });
   } catch (error) {
+    await services.previews.closeAll().catch(() => undefined);
     database.close();
     await mcpHandler.close();
     throw error;
   }
 
   logger.info('http_started', 'HTTP runtime started', { host: config.host, port: config.port });
+  if (tunnel.autoConnectEnabled()) {
+    void tunnel.connect()
+      .then((status) => logger.info('tunnel_auto_connected', 'Secure MCP tunnel auto-connect completed', { state: status.state }))
+      .catch((error: unknown) => logger.error('tunnel_auto_connect_failed', error));
+  }
   let closed = false;
 
   return {
@@ -222,7 +388,7 @@ export async function startHttpRuntime(config: AppConfig, logger: JsonLogger): P
       const serverClosed = new Promise<void>((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));
       });
-      await Promise.all([serverClosed, mcpHandler.close()]);
+      await Promise.all([serverClosed, mcpHandler.close(), services.previews.closeAll()]);
       database.close();
       logger.info('http_stopped', 'HTTP runtime stopped');
     },

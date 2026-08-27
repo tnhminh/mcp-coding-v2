@@ -14,11 +14,12 @@ Status: **FAIL — INCOMPLETE** (2026-08-26)
 | Project Brain / context / impact | PASS (core) | bounded persistent file/TS-JS graph, restart-safe snapshot, context budgets and related-test impact analysis PASS; richer BM25/Git/task ranking remains enhancement work |
 | command policies | PASS | structured task profiles only; command.run grant required; no caller raw shell; env/output/time bounds, redaction and process-tree cleanup tests PASS |
 | secret redaction | FAIL | JSON logger + task output redaction PASS, but full secret-reference/scanning coverage is not implemented |
-| workflow recovery | FAIL | not implemented |
-| full unit/integration/e2e/browser/deploy/rollback suites | FAIL | incomplete |
+| workflow recovery | PASS (core) | persistent AI Job state machine, invalid transition guards, CAS concurrency, fail→fix→review→complete evidence and runtime restart recovery tests PASS; workflow DAG remains enhancement |
+| browser/preview isolation | PASS (core) | loopback static/dev previews, sensitive static-path denial, preview_id confinement, client-side cross-origin HTTP/WebSocket blocking, Edge/Chrome DOM/console/network/screenshot E2E and process-tree cleanup PASS; OS-level dev-server network sandbox remains absent |
+| full unit/integration/e2e/browser/deploy/rollback suites | FAIL | unit/integration/MCP/browser core PASS; remote deployment/rollback qualification remains incomplete |
 | logs/metrics/traces/alerts | FAIL | structured JSON logs PASS; metrics/traces/alerts pending |
 | backup/restore/runbook qualification | FAIL | incomplete |
-| Control Center | FAIL | foundation PASS: `/control-center`, Overview, Project CRUD, MCP/tools and runtime Settings are real; full operations modules remain incomplete |
+| Control Center | FAIL | Overview, Project CRUD, Permissions/Policies, MCP/tools, AI Jobs, Workflow Runs, Browser/Preview QA and runtime Settings are real and live-browser reviewed; Brain/Tasks/Audit/Git/Remote/Deploy/Security completion remains incomplete |
 | docs/handoff baseline | PASS | current files present, explicitly mark gaps |
 
 Production Ready may only be declared when every applicable row is PASS with machine-verifiable evidence.

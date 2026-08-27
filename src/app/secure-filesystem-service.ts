@@ -19,7 +19,7 @@ import type { ProjectPathResolver, ResolvedProjectPath } from '../infra/filesyst
 
 const MAX_TEXT_FILE_BYTES = 1024 * 1024;
 const MAX_LIST_ENTRIES = 500;
-const MAX_LIST_DEPTH = 4;
+const MAX_LIST_DEPTH = 8;
 const MAX_SEARCH_FILES = 1000;
 const MAX_SEARCH_RESULTS = 100;
 const SKIP_DIRECTORIES = new Set(['.git', 'node_modules', 'dist', 'coverage', '.runtime']);
@@ -32,7 +32,7 @@ const SENSITIVE_EXTENSIONS = new Set(['.key', '.pem', '.p12', '.pfx']);
 
 export interface AuthorizedProjectRequest {
   projectId: string;
-  permissionSessionId: string;
+  permissionSessionId?: string;
 }
 
 export interface TextFileResult {
@@ -111,7 +111,7 @@ function pathSegments(relativePath: string): string[] {
   return relativePath.split(/[\\/]+/u).filter(Boolean).map((segment) => segment.toLowerCase());
 }
 
-function isSensitiveRelativePath(relativePath: string): boolean {
+export function isSensitiveRelativePath(relativePath: string): boolean {
   const segments = pathSegments(relativePath);
   if (segments.some((segment) => segment === '.git' || segment === '.ssh')) return true;
   const base = segments.at(-1) ?? '';

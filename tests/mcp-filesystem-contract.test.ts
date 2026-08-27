@@ -99,8 +99,13 @@ describe('MCP filesystem vibecode contract', () => {
       const projects = (projectList.structuredContent as { projects?: Array<{ id: string }> } | undefined)?.projects ?? [];
       expect(projects.some((project) => project.id === projectId)).toBe(true);
 
-      const bootstrap = await client.callTool({ name: 'workspace_bootstrap', arguments: { project_id: projectId, permission_session_id: permissionSessionId } });
-      expect(bootstrap.isError).not.toBe(true);
+      const autoList = await client.callTool({ name: 'list_files', arguments: { project_id: projectId, path: '.', depth: 2 } });
+      expect(autoList.isError, JSON.stringify(autoList.content)).not.toBe(true);
+      const autoEntries = (autoList.structuredContent as { entries?: Array<{ path: string }> } | undefined)?.entries ?? [];
+      expect(autoEntries.map((entry) => entry.path)).toEqual(expect.arrayContaining(['AGENTS.md', 'package.json', 'src']));
+
+      const bootstrap = await client.callTool({ name: 'workspace_bootstrap', arguments: { project_id: projectId } });
+      expect(bootstrap.isError, JSON.stringify(bootstrap.content)).not.toBe(true);
       const boot = bootstrap.structuredContent as { taskProfiles?: Array<{ id: string }>; skills?: Array<{ kind: string }> } | undefined;
       expect(boot?.taskProfiles?.map((profile) => profile.id)).toContain('test');
       expect(boot?.skills?.map((skill) => skill.kind)).toEqual(expect.arrayContaining(['agents', 'skill']));
@@ -148,8 +153,27 @@ describe('MCP filesystem vibecode contract', () => {
       expect(applyVerify.isError, JSON.stringify(applyVerify.content)).not.toBe(true);
       expect(applyVerify.structuredContent).toMatchObject({ verified: true, rolledBack: false });
       const reread = await client.callTool({ name: 'read_file', arguments: { project_id: projectId, permission_session_id: permissionSessionId, path: 'src/main.ts' } });
-      const rereadContent = (reread.structuredContent as { content?: string } | undefined)?.content;
-      expect(rereadContent).toContain('answer = 43');
+      const rereadStructured = reread.structuredContent as { content?: string; sha256?: string } | undefined;
+      expect(rereadStructured?.content).toContain('answer = 43');
+      if (!rereadStructured?.sha256) throw new Error('reread did not return SHA-256');
+
+      const cycle = await client.callTool({
+        name: 'coding_cycle',
+        arguments: {
+          project_id: projectId,
+          objective: 'Update the answer constant while keeping the project verification green.',
+          changes: [{ op: 'replace', path: 'src/main.ts', search: 'answer = 43', replacement: 'answer = 44', expected_sha256: rereadStructured.sha256 }],
+          tasks: ['test'],
+          iteration: 1,
+          max_iterations: 3,
+        },
+      });
+      expect(cycle.isError, JSON.stringify(cycle.content)).not.toBe(true);
+      expect(cycle.structuredContent).toMatchObject({ state: 'review_required', nextAction: 'review' });
+      const cycleVerification = (cycle.structuredContent as { verification?: { verified?: boolean }; afterReview?: unknown } | undefined)?.verification;
+      expect(cycleVerification?.verified).toBe(true);
+      const afterCycle = await client.callTool({ name: 'read_file', arguments: { project_id: projectId, permission_session_id: permissionSessionId, path: 'src/main.ts' } });
+      expect((afterCycle.structuredContent as { content?: string } | undefined)?.content).toContain('answer = 44');
 
       const write = await client.callTool({ name: 'write_file', arguments: { project_id: projectId, permission_session_id: permissionSessionId, path: 'src/generated.ts', content: 'export const generated = true;\n' } });
       expect(write.isError).not.toBe(true);

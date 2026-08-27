@@ -4,6 +4,7 @@ import { createServer as createNetServer } from 'node:net';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { afterEach, describe, expect, test } from 'vitest';
+import { mcpToolCatalog } from '../src/app/mcp-tool-catalog.js';
 
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
@@ -16,13 +17,29 @@ function createModernClient(): Client {
   );
 }
 
+function createLegacyClient(): Client {
+  return new Client({ name: 'mcp-coding-v2-legacy-contract-tests', version: '0.1.0' });
+}
+
 async function assertToolContract(client: Client): Promise<void> {
   const { tools } = await client.listTools();
+  expect(tools.map((tool) => tool.name).sort()).toEqual(mcpToolCatalog.map((tool) => tool.name).sort());
   expect(tools.map((tool) => tool.name)).toEqual(expect.arrayContaining([
-    'system_health', 'list_projects', 'project_info', 'workspace_bootstrap', 'list_task_profiles', 'run_task', 'list_skills', 'read_skill',
-    'brain_build', 'brain_status', 'find_symbol', 'symbol_references', 'context_bundle', 'impact_analysis', 'apply_and_verify',
-    'read_file', 'stat_path', 'list_files', 'search_text', 'write_file', 'append_file', 'diff_file', 'apply_patch', 'batch_patch', 'copy_file', 'move_file', 'delete_file',
+    'system_health', 'list_projects', 'project_info', 'project_access_status', 'workspace_bootstrap', 'list_task_profiles', 'run_task', 'list_command_recipes', 'run_command_recipe', 'list_skills', 'read_skill', 'project_guidance',
+    'brain_build', 'brain_status', 'find_symbol', 'symbol_references', 'context_bundle', 'impact_analysis', 'coding_cycle',
+    'agent_job_create', 'agent_job_list', 'agent_job_status', 'agent_job_cycle', 'agent_job_complete', 'agent_job_cancel',
+    'preview_profiles', 'preview_list', 'preview_start', 'preview_status', 'preview_stop', 'browser_review', 'apply_and_verify',
+    'read_file', 'read_files', 'stat_path', 'list_files', 'search_text', 'write_file', 'append_file', 'diff_file', 'apply_patch', 'batch_patch', 'copy_file', 'move_file', 'delete_file',
   ]));
+
+  const { resources } = await client.listResources();
+  expect(resources).toEqual(expect.arrayContaining([
+    expect.objectContaining({ uri: 'mcp://server/tool-catalog', name: 'tool-catalog' }),
+  ]));
+  const resource = await client.readResource({ uri: 'mcp://server/tool-catalog' });
+  const catalogText = resource.contents.find((content) => 'text' in content)?.text;
+  expect(catalogText).toContain('system_health');
+  expect(catalogText).toContain('browser_review');
 
   const result = await client.callTool({ name: 'system_health', arguments: {} });
   expect(result.isError).not.toBe(true);
@@ -125,6 +142,30 @@ describe('MCP 2026-07-28 protocol contracts', () => {
 
     try {
       await client.connect(transport, { timeout: 8_000 });
+      await assertToolContract(client);
+    } finally {
+      await client.close().catch(() => undefined);
+      child.kill();
+    }
+  }, 20_000);
+
+  test('Streamable HTTP accepts the 2025-era handshake used by legacy clients such as current ChatGPT web', async () => {
+    const port = await reservePort();
+    const child = track(
+      spawn(process.execPath, [tsxCli, 'src/entrypoints/http.ts'], {
+        cwd: process.cwd(),
+        env: { ...process.env, MCP_HOST: '127.0.0.1', MCP_PORT: String(port) },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }),
+    );
+
+    await waitForHealth(port);
+    const client = createLegacyClient();
+    const transport = new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`));
+
+    try {
+      await client.connect(transport, { timeout: 8_000 });
+      expect(client.getProtocolEra()).toBe('legacy');
       await assertToolContract(client);
     } finally {
       await client.close().catch(() => undefined);

@@ -80,7 +80,7 @@ export class ContextImpactService {
 
   async contextBundle(request: {
     projectId: string;
-    permissionSessionId: string;
+    permissionSessionId?: string;
     query: string;
     maxFiles?: number;
     maxChars?: number;
@@ -150,7 +150,7 @@ export class ContextImpactService {
 
   async impactAnalysis(request: {
     projectId: string;
-    permissionSessionId: string;
+    permissionSessionId?: string;
     seed: string;
     maxResults?: number;
   }): Promise<ImpactResult> {
