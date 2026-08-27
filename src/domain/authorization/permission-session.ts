@@ -4,6 +4,9 @@ import { capabilitySchema, type Capability } from './capability.js';
 
 const principalIdSchema = z.string().trim().min(1).max(160);
 const noteSchema = z.string().trim().max(500).nullable();
+export const MAX_PERMISSION_SESSION_TTL_SECONDS = 150 * 24 * 60 * 60;
+export const NO_EXPIRY_PERMISSION_SESSION_TTL_SECONDS = 0;
+export const NO_EXPIRY_TIMESTAMP = '9999-12-31T23:59:59.999Z';
 
 export interface PermissionSession {
   id: string;
@@ -29,7 +32,10 @@ export function createPermissionSession(
   options: { id?: string; now?: Date } = {},
 ): PermissionSession {
   const now = options.now ?? new Date();
-  const ttlSeconds = z.number().int().min(60).max(86_400).parse(input.ttlSeconds);
+  const ttlSeconds = z.union([
+    z.literal(NO_EXPIRY_PERMISSION_SESSION_TTL_SECONDS),
+    z.number().int().min(60).max(MAX_PERMISSION_SESSION_TTL_SECONDS),
+  ]).parse(input.ttlSeconds);
   const capabilities = [...new Set(z.array(capabilitySchema).min(1).parse(input.capabilities))];
   return {
     id: options.id ?? randomUUID(),
@@ -37,7 +43,9 @@ export function createPermissionSession(
     principalId: principalIdSchema.parse(input.principalId),
     capabilities,
     createdAt: now.toISOString(),
-    expiresAt: new Date(now.getTime() + ttlSeconds * 1000).toISOString(),
+    expiresAt: ttlSeconds === NO_EXPIRY_PERMISSION_SESSION_TTL_SECONDS
+      ? NO_EXPIRY_TIMESTAMP
+      : new Date(now.getTime() + ttlSeconds * 1000).toISOString(),
     revokedAt: null,
     note: noteSchema.parse(input.note ?? null),
   };

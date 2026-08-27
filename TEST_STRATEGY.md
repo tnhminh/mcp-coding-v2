@@ -30,6 +30,6 @@ Verified: `preview-browser.test.ts` runs real local Edge/Chrome headless against
 
 Verified: `audit-usage.test.ts` covers persistent audit/usage accounting, automatic real MCP tool-call instrumentation, explicit unavailable ChatGPT-via-MCP token visibility, provider-reported token totals/cost metadata and proof that Control Center audit excludes request-body markers/tool arguments.
 
-Current full gate: 25 test files / 101 tests PASS plus lint, strict typecheck, production build, `npm audit --omit=dev` with 0 vulnerabilities and `git diff --check` PASS. Phase 1 Bridge regressions cover native local Git operations, managed process lifecycle, exact MCP catalog/runtime parity and the required Bridge capability surface.
+Current full gate: 25 test files / 102 tests PASS plus lint, strict typecheck, production build, `npm audit --omit=dev` with 0 vulnerabilities and `git diff --check` PASS. Phase 1 Bridge regressions cover native local Git operations, managed process lifecycle, exact MCP catalog/runtime parity and the required Bridge capability surface.
 
-Next: complete remaining Project Brain + Tasks/Commands Control Center integration and strengthen audit actor identity/retention plus broader observability.
+Next: Phase 2 Skill Runtime verification coverage (manifest normalization, applicability/scope, requirements, composition/conflicts and verification hooks), followed by remaining Control Center/security/observability qualification.

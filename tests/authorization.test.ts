@@ -4,7 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { AuthorizationService } from '../src/app/authorization-service.js';
 import { AppError } from '../src/app/errors.js';
-import { createPermissionSession } from '../src/domain/authorization/permission-session.js';
+import { createPermissionSession, MAX_PERMISSION_SESSION_TTL_SECONDS, NO_EXPIRY_PERMISSION_SESSION_TTL_SECONDS, NO_EXPIRY_TIMESTAMP } from '../src/domain/authorization/permission-session.js';
 import { createAuthorizationPolicy } from '../src/domain/authorization/policy.js';
 import { createProject } from '../src/domain/projects/project.js';
 import { openSqliteDatabase, type SqliteDatabaseHandle } from '../src/infra/sqlite/database.js';
@@ -76,6 +76,42 @@ describe('authorization foundation', () => {
     await sessions.save(active);
     expect(await sessions.revoke(active.id, now.toISOString())).toBe(true);
     await expect(authorization.authorize({ projectId: alpha.id, permissionSessionId: active.id, capability: 'filesystem.read', now })).rejects.toMatchObject({ code: 'PERMISSION_EXPIRED' });
+  });
+
+  test('supports 150-day and explicit no-expiry sessions while preserving revoke semantics', async () => {
+    const project = await addProject('long-lived');
+    const now = new Date('2026-08-27T08:00:00.000Z');
+
+    const finite = createPermissionSession({
+      projectId: project.id,
+      principalId: 'long-lived-agent',
+      capabilities: ['filesystem.read'],
+      ttlSeconds: MAX_PERMISSION_SESSION_TTL_SECONDS,
+    }, { now });
+    expect(Date.parse(finite.expiresAt) - now.getTime()).toBe(MAX_PERMISSION_SESSION_TTL_SECONDS * 1000);
+
+    const noExpiry = createPermissionSession({
+      projectId: project.id,
+      principalId: 'trusted-local-agent',
+      capabilities: ['filesystem.read'],
+      ttlSeconds: NO_EXPIRY_PERMISSION_SESSION_TTL_SECONDS,
+    }, { now });
+    expect(noExpiry.expiresAt).toBe(NO_EXPIRY_TIMESTAMP);
+    await sessions.save(noExpiry);
+    await expect(authorization.authorize({
+      projectId: project.id,
+      permissionSessionId: noExpiry.id,
+      capability: 'filesystem.read',
+      now: new Date('2099-01-01T00:00:00.000Z'),
+    })).resolves.toMatchObject({ id: noExpiry.id });
+
+    expect(await sessions.revoke(noExpiry.id, now.toISOString())).toBe(true);
+    await expect(authorization.authorize({
+      projectId: project.id,
+      permissionSessionId: noExpiry.id,
+      capability: 'filesystem.read',
+      now,
+    })).rejects.toMatchObject({ code: 'PERMISSION_EXPIRED' });
   });
 
   test('global and project deny policies override a valid session grant', async () => {

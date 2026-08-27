@@ -52,6 +52,9 @@ describe('Control Center', () => {
     expect(pageText).toContain('id="panel-processes"');
     expect(pageText).toContain('Managed process control');
     expect(pageText).toContain('Git repository');
+    expect(pageText).toContain('90 days');
+    expect(pageText).toContain('150 days');
+    expect(pageText).toContain('No expiry');
     expect(pageText).toContain('id="panel-audit"');
     expect(pageText).toContain('id="panel-usage"');
     expect(pageText).toContain('Known provider token usage and MCP activity');
@@ -143,7 +146,7 @@ describe('Control Center', () => {
 
     const createdSession = await fetch(`http://127.0.0.1:${port}/api/projects/${project.id}/permission-sessions`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ principalId: 'local-agent', capabilities: ['filesystem.read', 'filesystem.write'], ttlSeconds: 3600 }),
+      body: JSON.stringify({ principalId: 'local-agent', capabilities: ['filesystem.read', 'filesystem.write'], ttlSeconds: 0 }),
     });
     expect(createdSession.status).toBe(201);
     const session = (await createdSession.json() as { permissionSession: { id: string } }).permissionSession;

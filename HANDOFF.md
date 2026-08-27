@@ -1,5 +1,17 @@
 # HANDOFF
 
+## Resume here
+- Repository: `E:\\mcp-coding-v2` (`mcp-coding-v2`).
+- Product state: **IN DEVELOPMENT / not production ready**.
+- Phase 1 Bridge: **verified complete**.
+- Active product phase: **Phase 2 — Skill Runtime V1**.
+- Last committed Phase 1 checkpoint: `1628b70` (`feat: complete phase 1 vibecode bridge`).
+- Latest verified full gate recorded in project docs: **25 test files / 102 tests PASS plus lint, strict typecheck and production build**.
+- Documentation/handoff hardening verification on 2026-08-27: `npm run check` PASS (25 files / 102 tests, lint/typecheck/build PASS) and `git diff --check` PASS.
+- Current working tree contains in-progress permission-session lifetime changes (150-day/no-expiry support) plus AI-handoff documentation hardening; preserve them unless intentionally superseding the same work.
+- AI cold start: read `AGENTS.md` -> this file -> `STATUS.md` -> active `TASKS.md` -> `VIBECODE_WORKFLOW.md`, then inspect Git status/context.
+- Exact next implementation direction after documentation hardening: P16 Skill Runtime V1 manifest/scope normalization, then applicability/activation, requirements, composition/conflicts and verification hooks.
+
 ## Purpose
 Build a production-grade AI software-engineering control plane exposed through MCP.
 
@@ -24,7 +36,7 @@ Strict TypeScript / Node ESM. MCP composition lives in `src/app/create-mcp-serve
 - localhost Control Center at `/control-center`
 - persistent SQLite-backed Project Registry CRUD via Control Center API
 - real Overview, MCP/tool status and effective runtime Settings panels; unfinished modules are explicitly disabled
-- temporary project-bound permission sessions with TTL/revoke and fixed capability catalog
+- project-bound permission sessions with fixed capability catalog, immediate revoke, 60s-150d finite TTL and explicit trusted-local no-expiry mode
 - global/project authorization policies with deny override semantics
 - real Permissions/Policies Control Center configuration
 - authorized Secure Filesystem tools over stdio + HTTP: read/stat/list/search/write/append/diff/patch/batch-patch/copy/move/delete
@@ -56,7 +68,7 @@ Strict TypeScript / Node ESM. MCP composition lives in `src/app/create-mcp-serve
 - bounded weighted lexical+graph context retrieval and declaration/reference/importer/related-test impact analysis
 
 ## Current task
-Phase 2 Skill Runtime V1 - turn discovered AGENTS/SKILL/rule files into an executable, scoped skill runtime before building the integrated Coding Harness.
+Phase 2 Skill Runtime V1 - turn discovered AGENTS/SKILL/rule files into an executable, scoped skill runtime before building the integrated Coding Harness. The repository now includes root `AGENTS.md` and `VIBECODE_WORKFLOW.md` so a cold-start AI can resume without conversation history.
 
 ## Next task
 Skill Runtime V1: normalize skill manifests, activation/applicability rules, scope inheritance, tool requirements, composition/conflict behavior and verification hooks. Coding Harness follows after this phase; remote/deploy remain deferred.

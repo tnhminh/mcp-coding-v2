@@ -99,9 +99,9 @@ http://127.0.0.1:7317/mcp
 
 The client must support modern MCP negotiation. The server targets MCP specification `2026-07-28`.
 
-The currently exposed MCP surface includes `system_health` plus secure project filesystem tools: `read_file`, `stat_path`, `list_files`, `search_text`, `write_file`, `append_file`, `diff_file`, `apply_patch`, `batch_patch`, `copy_file`, `move_file` and `delete_file`.
+The exposed MCP surface is broader than the filesystem layer: project/bootstrap/readiness, secure filesystem, structured tasks/command recipes, managed processes, local Git, Project Brain/context/impact, apply-and-verify/coding cycle/AI Jobs, preview/browser review and audit-related operational capabilities are implemented. Use `TOOL_CATALOG.md` as the current capability inventory rather than copying a potentially stale tool list into this runbook.
 
-Filesystem tools require a registered project ID and a valid project-bound permission session with the corresponding read/write capability. Permission sessions can be issued from the Control Center. Existing-file writes/patches require the SHA-256 returned by `read_file`; this prevents silent overwrite of a file changed since the AI read it.
+Privileged project tools require the relevant project-scoped authorization. Permission sessions can be issued from the Control Center; finite sessions support 60 seconds through 150 days, and trusted-local agents may explicitly use no-expiry mode. Enabled deny policies still override grants. Existing-file writes/patches use SHA-256 optimistic concurrency to prevent silent overwrite of changed files.
 
 ## 9. Use stdio instead of HTTP
 
@@ -207,4 +207,6 @@ Confirm in order:
 
 ## 15. Current limitations
 
-This repository is still in development. Local Project Registry, permission sessions/policies and the secure filesystem coding surface are implemented. The next priority is structured task/command execution, apply+verify and project/tool/skill discovery so an MCP client can work end-to-end on registered local projects. Production identity/RBAC, Brain/workflows, browser/remote/deploy and broader observability remain incomplete; Git MCP features are intentionally deferred. See `STATUS.md`, `TASKS.md` and `PRODUCTION_READINESS_REPORT.md` for verified status.
+This repository is still in development, but Phase 1 Bridge is verified complete. Structured task/command execution, apply+verify, Project Brain/context/impact, persistent AI Jobs/coding cycle, local Git, managed processes and loopback Browser/Preview QA are already implemented.
+
+The active priority is **Phase 2 Skill Runtime V1**. Production identity/RBAC, broader secret scanning, richer retrieval/workflow DAG, Remote SSH/SFTP, deployment/rollback, richer observability and final production qualification remain incomplete. See `AGENTS.md`, `HANDOFF.md`, `STATUS.md`, `TASKS.md` and `PRODUCTION_READINESS_REPORT.md` for current verified state.

@@ -2,6 +2,14 @@
 
 Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
 
+## Product roadmap / epic mapping
+- [x] **Phase 1 — Bridge / engineering control plane.** Primarily P0-P4.7 plus the core Project Brain, Context/Impact, AI Job, Browser/Preview and Control Center primitives needed for a useful bridge. Verified complete; current full gate is 25 files / 102 tests PASS.
+- [~] **Phase 2 — Skill Runtime V1.** Convert discovered AGENTS/SKILL/prompt/rule files into normalized, scoped, activatable runtime behavior with tool requirements, composition/conflict rules and verification hooks. Tracked under P16 below.
+- [ ] **Phase 3 — Integrated Coding Harness.** Compose existing primitives into task state, context selection, planning, multi-step execution, verification/retry and checkpoints. Tracked under P17.
+- [ ] **Phase 4 — Autonomous Vibecode.** Higher-level goal execution built on the secured Bridge + Skill Runtime + Coding Harness. Tracked under P18.
+
+The P-number epics are implementation workstreams; the Phase 1-4 roadmap describes product maturity. A completed primitive such as `coding_cycle` does not by itself mean the integrated Phase 3 Harness exists.
+
 ## EPIC P0 — Discovery and architecture
 - [x] P0-T01 Inspect repository and detect zero-code baseline.
   - Acceptance: source/manifests/Git state recorded truthfully.
@@ -31,7 +39,7 @@ Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
 - [x] P2-T02 Canonical root/path resolver and cross-project isolation tests.
   - Evidence: traversal, absolute escape, junction/symlink escape, nested-project exclusion, duplicate canonical-root conflict and Windows unsafe-path tests PASS through registry-aware resolver factory.
 - [x] P2-T03 Capability model and temporary permission sessions.
-  - Evidence: project-bound capability grants with 60s–24h TTL, revoke/expiry enforcement, inactive/wrong-project rejection and CMS issuance/revocation tests PASS.
+  - Evidence: project-bound capability grants with 60s–150d finite TTL plus explicit no-expiry mode, revoke/expiry enforcement, inactive/wrong-project rejection and CMS issuance/revocation tests PASS.
 - [x] P2-T04 Global/project policy persistence and deterministic enforcement hooks.
   - Evidence: SQLite-backed global/project policies; enabled deny rules override valid session grants; CMS create/update/delete controls and authorization tests PASS.
 
@@ -83,7 +91,7 @@ Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
 - [x] P6-T01 bounded weighted lexical + graph context ranking.
   - Evidence: context_bundle combines exact/partial symbol, identifier reference, import/path and Secure Filesystem literal-text evidence.
 - [ ] P6-T02 richer BM25 + Git/task-aware ranking.
-  - Note: Git-aware ranking remains deferred with Git feature work; current weighted lexical+graph retrieval is production-bounded but is not claimed as BM25.
+  - Note: richer BM25 + Git/task-aware ranking remains deferred; the local Git runtime is already implemented, but current weighted lexical+graph retrieval does not yet consume Git/task signals and is not claimed as BM25.
 - [x] P6-T03 bounded context bundle + blast-radius/related-test analysis.
   - Evidence: context_bundle enforces file/character budgets; impact_analysis traces file/symbol declarations, references, importers, second-wave importers, related tests and nearby configs.
 
@@ -99,8 +107,9 @@ Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
 - [ ] P7-T03 task dependency graph / multi-step workflow DAG and richer stable job accounting.
 
 ## EPIC P8 — Git/GitHub
-- [ ] safe read/write Git operations.
-- [ ] secret scan/elevation before remote push; private-by-default repository creation.
+- [x] safe project-scoped local Git read/write operations.
+  - Evidence: Phase 1 P4.7 provides status/diff/log/branches/stage/unstage/create/switch/commit/restore with exact registered-repository scoping and no implicit push.
+- [ ] GitHub/remote publishing, secret scan/elevation before push and private-by-default repository creation.
 
 ## EPIC P9 — Browser + Preview
 - [x] P9-T01 Playwright browser review with DOM/screenshot/console/network/action evidence.
@@ -124,7 +133,7 @@ Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
 - [~] P12-T03 Project Brain + Tasks / Commands operational panels over existing real services.
 - [x] P12-T04 Tool Calls + Audit / Activity + Usage accounting.
   - Evidence: persistent Audit Log filters by project/status/category/search; Usage dashboard aggregates provider/model/day, actual/estimated token metadata, MCP tool calls and explicit token-visibility gaps. ChatGPT-via-MCP tokens are never fabricated when upstream does not expose them.
-- [ ] P12-T05 Git, Remote, Deployments, Security and remaining Settings surfaces as their production backends land.
+- [ ] P12-T05 Remote Git publishing, Remote, Deployments, Security and remaining Settings surfaces as their production backends land. Local Git and Processes surfaces are already live from Phase 1.
 
 ## EPIC P13 — Security hardening
 - [ ] threat-model test suite: traversal, symlink escape, injection, prompt/repo abuse, secrets, SSRF/browser abuse, cross-project/tenant, auth bypass, replay, DoS/output limits, archive/supply-chain.
@@ -134,3 +143,22 @@ Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
 
 ## EPIC P15 — Production qualification
 - [ ] execute every gate in `PRODUCTION_READINESS_REPORT.md`; no subjective READY declaration.
+
+## EPIC P16 — Phase 2 Skill Runtime
+- [~] P16-T01 Skill Runtime V1 manifest and scope model.
+  - Acceptance: discovered AGENTS/SKILL/prompt/rule inputs normalize into bounded typed runtime descriptors with source, scope, precedence/applicability metadata and validation failures represented explicitly.
+- [ ] P16-T02 activation/applicability + scope inheritance.
+- [ ] P16-T03 required tool/capability checks and unavailable-requirement behavior.
+- [ ] P16-T04 deterministic composition/conflict precedence.
+- [ ] P16-T05 verification hooks + workspace/coding lifecycle integration.
+- [ ] P16-T06 Skill Runtime MCP/Control Center evidence and full regression gate.
+
+## EPIC P17 — Phase 3 Integrated Coding Harness
+- [ ] task state + repo/context selection + explicit plan model.
+- [ ] multi-step execution loop using existing filesystem/commands/process/Git/browser primitives.
+- [ ] verification routing, diagnosis/retry budgets and checkpoints.
+- [ ] resumable handoff/evidence contract above the existing bounded `coding_cycle` primitive.
+
+## EPIC P18 — Phase 4 Autonomous Vibecode
+- [ ] goal-level execution contract built on Bridge + Skill Runtime + Coding Harness.
+- [ ] bounded autonomy, stop/escalation policy, production trust-boundary enforcement and end-to-end qualification.

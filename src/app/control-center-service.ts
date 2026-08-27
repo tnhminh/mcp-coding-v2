@@ -12,7 +12,7 @@ import { HealthService } from './health-service.js';
 import { mcpToolCatalog } from './mcp-tool-catalog.js';
 import { allCapabilities, capabilitySchema } from '../domain/authorization/capability.js';
 import type { PermissionSessionRepository } from '../domain/authorization/permission-session-repository.js';
-import { createPermissionSession, isPermissionSessionActive, type PermissionSession } from '../domain/authorization/permission-session.js';
+import { createPermissionSession, isPermissionSessionActive, MAX_PERMISSION_SESSION_TTL_SECONDS, NO_EXPIRY_PERMISSION_SESSION_TTL_SECONDS, type PermissionSession } from '../domain/authorization/permission-session.js';
 import type { PolicyRepository } from '../domain/authorization/policy-repository.js';
 import { createAuthorizationPolicy, policyEffectSchema, type AuthorizationPolicy } from '../domain/authorization/policy.js';
 import { createProject, touchProject, type Project } from '../domain/projects/project.js';
@@ -39,7 +39,10 @@ const updateProjectInputSchema = z.object({
 const permissionSessionInputSchema = z.object({
   principalId: z.string().trim().min(1).max(160),
   capabilities: z.array(capabilitySchema).min(1),
-  ttlSeconds: z.number().int().min(60).max(86_400).default(3600),
+  ttlSeconds: z.union([
+    z.literal(NO_EXPIRY_PERMISSION_SESSION_TTL_SECONDS),
+    z.number().int().min(60).max(MAX_PERMISSION_SESSION_TTL_SECONDS),
+  ]).default(3600),
   note: z.string().trim().max(500).nullable().optional(),
 }).strict();
 
@@ -201,7 +204,8 @@ export class ControlCenterService {
       },
       authorization: {
         capabilities: allCapabilities,
-        maxPermissionSessionTtlSeconds: 86_400,
+        maxPermissionSessionTtlSeconds: MAX_PERMISSION_SESSION_TTL_SECONDS,
+      supportsNoExpiryPermissionSessions: true,
         model: 'session grant required; enabled deny policies override grants',
       },
       note: 'Runtime settings are environment-backed. Changes require restart.',

@@ -1,16 +1,42 @@
-﻿# MCP Coding v2
+# MCP Coding v2
 
-Production-oriented MCP software-engineering control plane. Verified scope now includes MCP 2026-07-28 runtime, SQLite Project Registry, temporary permissions/policies, canonical cross-project isolation, a real Control Center, secure local-project filesystem tools, workspace/skill discovery, structured project tasks, apply-and-verify rollback orchestration, and a persistent bounded Project Brain with context/impact tools.
+Production-oriented MCP software-engineering control plane for AI coding agents. ChatGPT/another AI acts as the reasoning brain; MCP Coding v2 provides secure project-scoped execution, code intelligence, verification and local engineering operations.
+
+## Current status
+
+- **Phase 1 — Bridge:** verified complete.
+- **Phase 2 — Skill Runtime V1:** active.
+- **Phase 3 — Integrated Coding Harness:** next.
+- **Phase 4 — Autonomous Vibecode:** later.
+- **Product:** IN DEVELOPMENT — not production ready.
+
+Verified Phase 1/core capabilities include MCP 2026-07-28 stdio + Streamable HTTP, SQLite Project Registry, permission sessions/policies, secure filesystem, structured tasks/commands, managed processes, local Git, Project Brain/context/impact, apply-and-verify, AI Jobs/coding cycle, loopback preview/browser QA, Audit/Usage and the localhost Control Center.
+
+## AI contributors
+
+Start with **`AGENTS.md`**. It defines the mandatory read order, source-of-truth rules, security invariants and Definition of Done.
+
+Then resume from:
+
+1. `HANDOFF.md`
+2. `STATUS.md`
+3. active sections in `TASKS.md`
+4. `VIBECODE_WORKFLOW.md`
 
 ## Run
+
 - `npm install`
 - `npm run dev:stdio`
 - `npm run dev:http` (default `127.0.0.1:7317`)
-- `npm run build && npm run start:http` on shells that support `&&`, or run the two commands separately in Windows PowerShell
+- `npm run build` then `npm run start:http`
 - `npm run check`
 
-Control Center: `http://127.0.0.1:7317/control-center` (or open `/`, which redirects there).
+Control Center: `http://127.0.0.1:7317/control-center`
 
-Full localhost installation/connection/stop/restart instructions: `LOCALHOST_GUIDE.md`.
+MCP HTTP endpoint: `http://127.0.0.1:7317/mcp`
 
-This repository is not yet production ready. See `STATUS.md` and `PRODUCTION_READINESS_REPORT.md`.
+Full localhost installation, connection, stop and restart instructions: `LOCALHOST_GUIDE.md`.
+
+Capability inventory: `TOOL_CATALOG.md`.
+
+Production gate status: `PRODUCTION_READINESS_REPORT.md`.

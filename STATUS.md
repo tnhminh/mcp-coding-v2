@@ -1,9 +1,19 @@
 # STATUS
 
-Updated: 2026-08-26
+Updated: 2026-08-27
 
 ## Overall
 `IN DEVELOPMENT` — not production ready.
+
+## Current snapshot
+- Product phase: **Phase 2 — Skill Runtime V1 (ACTIVE)**.
+- Phase 1 Bridge: **VERIFIED COMPLETE**.
+- Next product phase: **Phase 3 — Integrated Coding Harness**.
+- Last committed Phase 1 checkpoint: `1628b70` (`feat: complete phase 1 vibecode bridge`).
+- Current verified full gate: lint + strict typecheck + 102 tests across 25 files + production build PASS.
+- Local runtime default: `127.0.0.1:7317`; Control Center: `/control-center`; MCP: `/mcp`.
+- Production readiness: **FAIL / incomplete**; use `PRODUCTION_READINESS_REPORT.md` rather than inferring readiness from Phase 1 completion.
+- AI contributors must start from `AGENTS.md` and `HANDOFF.md` and inspect Git status before editing.
 
 ## Verified complete
 - Empty-repository discovery.
@@ -19,7 +29,7 @@ Updated: 2026-08-26
 - Structured application error model with safe public projection.
 - JSON logging with reserved-field isolation and sensitive-key redaction; generic internal error messages are not emitted raw.
 - Graceful/idempotent HTTP runtime close verified.
-- `npm run check`: lint + strict typecheck + 101 tests across 25 files + production build PASS; Phase 1 Bridge capability gate, native Git runtime, managed process runtime, Audit/Usage, Control Center, tunnel, readiness and real MCP/browser regressions are covered.
+- `npm run check`: lint + strict typecheck + 102 tests across 25 files + production build PASS; Phase 1 Bridge capability gate, native Git runtime, managed process runtime, Audit/Usage, Control Center, tunnel, readiness and real MCP/browser regressions are covered.
 - Project aggregate and async repository interface designed for SQLite/PostgreSQL interchangeability.
 - SQLite persistence via `better-sqlite3` 13.0.3 with versioned transactional migration `001_projects`, foreign keys, busy timeout and WAL for file databases.
 - Project persistence verifies complete aggregate round-trip, case-insensitive alias uniqueness, update/delete behavior and JSON-only metadata.
@@ -28,7 +38,7 @@ Updated: 2026-08-26
 - Control Center is live at `/control-center` with operational Overview, real SQLite-backed Project Registry CRUD, MCP/tool status, Permissions/Policies, persistent AI Jobs, Workflow Runs, Browser/Preview QA, Secure MCP Tunnel, persistent Audit Log, Usage accounting and effective runtime Settings.
 - Persistent Audit/Usage migration `005_audit_usage` records MCP tool calls and mutating localhost Control Center APIs without storing request bodies, prompts, file contents, API keys or permission-session bearer values. The Usage ledger records actual/estimated provider token metadata when supplied; ChatGPT-Web-via-MCP token counts remain explicitly `unavailable` because they are not exposed to the MCP server.
 - Control Center APIs are localhost Host/Origin guarded; request JSON is bounded and validated; unavailable modules are displayed as pending rather than simulated.
-- Capability model includes `filesystem.read`, `filesystem.write`, `command.run`, `git.read`, `git.write`; grants require project-bound temporary permission sessions (maximum 24h) and support immediate revoke.
+- Capability model includes `filesystem.read`, `filesystem.write`, `command.run`, `git.read`, `git.write`; grants require project-bound permission sessions, support finite TTL from 60 seconds to 150 days or explicit trusted-local no-expiry mode, and always support immediate revoke.
 - Global/project authorization policies persist in SQLite; enabled deny policies override session grants deterministically.
 - Permissions and Policies Control Center modules now create/revoke sessions and create/update/delete policies using real APIs.
 - Secure Filesystem MCP surface is live over both HTTP and stdio: read/stat/list/search, atomic write/append, diff, exact/batch patch, copy/move/delete.
