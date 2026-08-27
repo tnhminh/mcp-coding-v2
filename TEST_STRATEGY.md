@@ -1,4 +1,4 @@
-﻿# TEST_STRATEGY
+# TEST_STRATEGY
 
 Layers: unit, integration, MCP protocol contract, end-to-end, browser, deployment/rollback and adversarial security tests.
 
@@ -30,6 +30,6 @@ Verified: `preview-browser.test.ts` runs real local Edge/Chrome headless against
 
 Verified: `audit-usage.test.ts` covers persistent audit/usage accounting, automatic real MCP tool-call instrumentation, explicit unavailable ChatGPT-via-MCP token visibility, provider-reported token totals/cost metadata and proof that Control Center audit excludes request-body markers/tool arguments.
 
-Current full gate: 22 test files / 93 tests PASS plus lint, strict typecheck, production build, `npm audit --omit=dev` with 0 vulnerabilities and `git diff --check` PASS. Auto Task Discovery regressions cover safe package aliases, framework/ecosystem precedence over legacy static checks and Maven ecosystem discovery; Agent Capability Enablement covers access introspection, expanded skill/guidance formats, all declared safe-name package scripts and exact MCP tool-catalog/runtime registration; Project Readiness regressions cover missing dependencies, structured auto-install, baseline verification and task failure classification. Live Control Center browser QA additionally runs against the compiled localhost runtime after each completed task.
+Current full gate: 25 test files / 101 tests PASS plus lint, strict typecheck, production build, `npm audit --omit=dev` with 0 vulnerabilities and `git diff --check` PASS. Phase 1 Bridge regressions cover native local Git operations, managed process lifecycle, exact MCP catalog/runtime parity and the required Bridge capability surface.
 
 Next: complete remaining Project Brain + Tasks/Commands Control Center integration and strengthen audit actor identity/retention plus broader observability.

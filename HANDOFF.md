@@ -1,4 +1,4 @@
-﻿# HANDOFF
+# HANDOFF
 
 ## Purpose
 Build a production-grade AI software-engineering control plane exposed through MCP.
@@ -56,10 +56,10 @@ Strict TypeScript / Node ESM. MCP composition lives in `src/app/create-mcp-serve
 - bounded weighted lexical+graph context retrieval and declaration/reference/importer/related-test impact analysis
 
 ## Current task
-Agent Harness V1 — build the professional single-agent coding harness over the verified local vibecode capability surface.
+Phase 2 Skill Runtime V1 - turn discovered AGENTS/SKILL/rule files into an executable, scoped skill runtime before building the integrated Coding Harness.
 
 ## Next task
-Harness Phase A: persistent Project Execution Context + objective/plan/task decomposition + deterministic tool router. Git/remote/deploy remain deferred until the coding harness is complete.
+Skill Runtime V1: normalize skill manifests, activation/applicability rules, scope inheritance, tool requirements, composition/conflict behavior and verification hooks. Coding Harness follows after this phase; remote/deploy remain deferred.
 
 ## Run/test/build
 `npm install`; `npm run dev:stdio`; `npm run dev:http`; `npm run check`.

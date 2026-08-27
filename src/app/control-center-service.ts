@@ -2,6 +2,8 @@ import { z } from 'zod';
 import type { AiJobService } from './ai-job-service.js';
 import type { AuditUsageService } from './audit-usage-service.js';
 import type { AppConfig } from './config.js';
+import type { GitService } from './git-service.js';
+import type { ManagedProcessService } from './managed-process-service.js';
 import type { PreviewService } from './preview-service.js';
 import type { TunnelIntegrationService } from './tunnel-integration-service.js';
 import type { WindowsAutoStartService } from './windows-autostart-service.js';
@@ -70,6 +72,11 @@ const previewStartInputSchema = z.object({
   permissionSessionId: z.string().uuid().optional(),
 }).strict();
 
+const processStartInputSchema = z.object({
+  profileId: z.string().trim().min(1).max(160),
+  permissionSessionId: z.string().uuid().optional(),
+}).strict();
+
 const browserActionInputSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('click'), selector: z.string().min(1).max(500) }).strict(),
   z.object({ type: z.literal('click_text'), text: z.string().min(1).max(500) }).strict(),
@@ -128,6 +135,8 @@ export class ControlCenterService {
     private readonly policies: PolicyRepository,
     private readonly aiJobs: AiJobService,
     private readonly previews: PreviewService,
+    private readonly git: GitService,
+    private readonly processes: ManagedProcessService,
     private readonly tunnel: TunnelIntegrationService,
     private readonly autoStart: WindowsAutoStartService,
     private readonly auditUsage: AuditUsageService,
@@ -171,7 +180,8 @@ export class ControlCenterService {
       { id: 'tunnel', label: 'Secure MCP Tunnel', state: 'available' },
       { id: 'audit', label: 'Audit Log', state: 'available' },
       { id: 'usage', label: 'Usage', state: 'available' },
-      { id: 'git', label: 'Git / GitHub', state: 'planned' },
+      { id: 'git', label: 'Git', state: 'available' },
+      { id: 'processes', label: 'Processes', state: 'available' },
       { id: 'browser', label: 'Browser / Preview', state: 'available' },
       { id: 'remote', label: 'Remote / Deploy', state: 'planned' },
     ];
@@ -402,6 +412,50 @@ export class ControlCenterService {
       actions: parsed.data.actions,
       ...(parsed.data.permissionSessionId === undefined ? {} : { permissionSessionId: parsed.data.permissionSessionId }),
     });
+  }
+
+  async gitStatus(projectId: string): Promise<Awaited<ReturnType<GitService['status']>>> {
+    if (!await this.projects.findById(projectId)) throw new AppError({ code: 'NOT_FOUND', message: 'Project was not found.', httpStatus: 404, expose: true });
+    return this.git.status({ projectId });
+  }
+
+  async gitLog(projectId: string, limit = 20): Promise<Awaited<ReturnType<GitService['log']>>> {
+    if (!await this.projects.findById(projectId)) throw new AppError({ code: 'NOT_FOUND', message: 'Project was not found.', httpStatus: 404, expose: true });
+    return this.git.log({ projectId, limit });
+  }
+
+  async gitBranches(projectId: string): Promise<Awaited<ReturnType<GitService['branches']>>> {
+    if (!await this.projects.findById(projectId)) throw new AppError({ code: 'NOT_FOUND', message: 'Project was not found.', httpStatus: 404, expose: true });
+    return this.git.branches({ projectId });
+  }
+
+  async processProfiles(projectId: string): Promise<Awaited<ReturnType<ManagedProcessService['profiles']>>> {
+    if (!await this.projects.findById(projectId)) throw new AppError({ code: 'NOT_FOUND', message: 'Project was not found.', httpStatus: 404, expose: true });
+    return this.processes.profiles({ projectId });
+  }
+
+  async listProcesses(projectId: string): Promise<Awaited<ReturnType<ManagedProcessService['list']>>> {
+    if (!await this.projects.findById(projectId)) throw new AppError({ code: 'NOT_FOUND', message: 'Project was not found.', httpStatus: 404, expose: true });
+    return this.processes.list({ projectId });
+  }
+
+  async startProcess(projectId: string, input: unknown): Promise<Awaited<ReturnType<ManagedProcessService['start']>>> {
+    if (!await this.projects.findById(projectId)) throw new AppError({ code: 'NOT_FOUND', message: 'Project was not found.', httpStatus: 404, expose: true });
+    const parsed = processStartInputSchema.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    return this.processes.start({
+      projectId,
+      profileId: parsed.data.profileId,
+      ...(parsed.data.permissionSessionId === undefined ? {} : { permissionSessionId: parsed.data.permissionSessionId }),
+    });
+  }
+
+  async processStatus(projectId: string, processId: string): Promise<Awaited<ReturnType<ManagedProcessService['status']>>> {
+    return this.processes.status({ projectId, processId });
+  }
+
+  async stopProcess(projectId: string, processId: string): Promise<Awaited<ReturnType<ManagedProcessService['stop']>>> {
+    return this.processes.stop({ projectId, processId });
   }
 
   tunnelStatus(): ReturnType<TunnelIntegrationService['status']> {

@@ -1,4 +1,4 @@
-﻿# TASKS
+# TASKS
 
 Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
 
@@ -67,7 +67,9 @@ Status legend: `[x]` verified, `[ ]` planned, `[~]` active.
 - [x] P4.5 Agent Capability Enablement gate before Agent Harness V1.
   - Evidence: `project_access_status`, `project_guidance`, `read_files`, expanded nested/common agent instruction discovery, all existing safe-name package.json scripts through structured `package.script`, bootstrap capability manifest/project script inventory, and exact runtime tools/list == tool catalog regression.
 - [x] P4.6 Project Readiness Preflight before Agent Harness V1.
-  - Evidence: `project_readiness` separates missing dependencies/configuration from source failures; `prepare_workspace` installs missing declared dependencies and captures baseline verification; task results expose `failureKind`; legacy static `check` is suppressed when package/ecosystem verifiers already exist. Full gate 22 files / 93 tests PASS.
+  - Evidence: `project_readiness` separates missing dependencies/configuration from source failures; `prepare_workspace` installs missing declared dependencies and captures baseline verification; task results expose `failureKind`; legacy static `check` is suppressed when package/ecosystem verifiers already exist.
+- [x] P4.7 Phase 1 Bridge Finalization.
+  - Evidence: native local Git status/diff/log/branch/stage/unstage/commit/restore tools; runtime-owned long-running process profiles/list/start/status/stop; Git + Processes Control Center panels/APIs; shutdown cleanup; machine-verifiable Phase 1 tool/capability gate. Full gate 25 files / 101 tests PASS.
 
 ## EPIC P5 — Project Brain
 - [x] P5-T01 Incremental file/language/symbol/import/reference/test/config index.

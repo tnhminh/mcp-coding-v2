@@ -1,6 +1,7 @@
 import { AuthorizationService } from './authorization-service.js';
 import { CommandRecipeService } from './command-recipe-service.js';
 import { mcpToolCatalog } from './mcp-tool-catalog.js';
+import { ManagedProcessService } from './managed-process-service.js';
 import { PreviewService } from './preview-service.js';
 import { ProjectDiscoveryService } from './project-discovery-service.js';
 import { ProjectReadinessService } from './project-readiness-service.js';
@@ -13,17 +14,19 @@ export class WorkspaceBootstrapService {
     private readonly authorization: AuthorizationService,
     private readonly tasks: TaskRunnerService,
     private readonly commandRecipes: CommandRecipeService,
+    private readonly processes: ManagedProcessService,
     private readonly skills: SkillDiscoveryService,
     private readonly previews: PreviewService,
     private readonly readiness: ProjectReadinessService,
   ) {}
 
   async bootstrap(request: { projectId: string; permissionSessionId?: string }): Promise<Record<string, unknown>> {
-    const [project, access, taskProfiles, commandRecipes, skills, previewProfiles, readiness] = await Promise.all([
+    const [project, access, taskProfiles, commandRecipes, processProfiles, skills, previewProfiles, readiness] = await Promise.all([
       this.projects.projectInfo(request.projectId),
       this.authorization.inspectAccess(request),
       this.tasks.listTaskProfiles(request),
       this.commandRecipes.listRecipes(request),
+      this.processes.profiles(request),
       this.skills.listSkills(request),
       this.previews.profiles(request),
       this.readiness.inspect(request),
@@ -45,6 +48,7 @@ export class WorkspaceBootstrapService {
       tools: mcpToolCatalog,
       taskProfiles,
       commandRecipes,
+      processProfiles,
       projectScripts: {
         manager: packageScriptRecipe?.manager ?? null,
         available: packageScriptRecipe?.allowedScripts ?? [],

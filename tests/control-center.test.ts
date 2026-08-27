@@ -46,6 +46,12 @@ describe('Control Center', () => {
     expect(pageText).toContain('Save secure setup');
     expect(pageText).toContain('data-panel="audit"');
     expect(pageText).toContain('data-panel="usage"');
+    expect(pageText).toContain('data-panel="git"');
+    expect(pageText).toContain('data-panel="processes"');
+    expect(pageText).toContain('id="panel-git"');
+    expect(pageText).toContain('id="panel-processes"');
+    expect(pageText).toContain('Managed process control');
+    expect(pageText).toContain('Git repository');
     expect(pageText).toContain('id="panel-audit"');
     expect(pageText).toContain('id="panel-usage"');
     expect(pageText).toContain('Known provider token usage and MCP activity');
@@ -60,6 +66,8 @@ describe('Control Center', () => {
     expect(data.modules.find((module) => module.id === 'tunnel')?.state).toBe('available');
     expect(data.modules.find((module) => module.id === 'audit')?.state).toBe('available');
     expect(data.modules.find((module) => module.id === 'usage')?.state).toBe('available');
+    expect(data.modules.find((module) => module.id === 'git')?.state).toBe('available');
+    expect(data.modules.find((module) => module.id === 'processes')?.state).toBe('available');
 
     const tunnelResponse = await fetch(`http://127.0.0.1:${port}/api/tunnel/status`);
     expect(tunnelResponse.status).toBe(200);

@@ -23,6 +23,8 @@ function main(): void {
     readiness: services.readiness,
     tasks: services.tasks,
     commandRecipes: services.commandRecipes,
+    git: services.git,
+    processes: services.processes,
     skills: services.skills,
     workspace: services.workspace,
     applyVerify: services.applyVerify,

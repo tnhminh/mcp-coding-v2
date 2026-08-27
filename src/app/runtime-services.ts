@@ -7,6 +7,8 @@ import { AuthorizationService } from './authorization-service.js';
 import { CodingCycleService } from './coding-cycle-service.js';
 import { CommandRecipeService } from './command-recipe-service.js';
 import { ContextImpactService } from './context-impact-service.js';
+import { GitService } from './git-service.js';
+import { ManagedProcessService } from './managed-process-service.js';
 import { ProjectPathResolverFactory } from './project-path-resolver-factory.js';
 import { ProjectDiscoveryService } from './project-discovery-service.js';
 import { PreviewService } from './preview-service.js';
@@ -32,6 +34,8 @@ export interface RuntimeServices {
   projectDiscovery: ProjectDiscoveryService;
   tasks: TaskRunnerService;
   commandRecipes: CommandRecipeService;
+  git: GitService;
+  processes: ManagedProcessService;
   skills: SkillDiscoveryService;
   workspace: WorkspaceBootstrapService;
   applyVerify: ApplyVerifyService;
@@ -59,9 +63,11 @@ export function createRuntimeServices(database: Database.Database, databaseFilen
   const projectDiscovery = new ProjectDiscoveryService(projects);
   const tasks = new TaskRunnerService(authorization, paths);
   const commandRecipes = new CommandRecipeService(authorization, paths);
+  const git = new GitService(authorization, paths);
+  const processes = new ManagedProcessService(authorization, paths);
   const skills = new SkillDiscoveryService(authorization, filesystem);
   const readiness = new ProjectReadinessService(authorization, paths, tasks, commandRecipes);
-  const workspace = new WorkspaceBootstrapService(projectDiscovery, authorization, tasks, commandRecipes, skills, previews, readiness);
+  const workspace = new WorkspaceBootstrapService(projectDiscovery, authorization, tasks, commandRecipes, processes, skills, previews, readiness);
   const applyVerify = new ApplyVerifyService(authorization, filesystem, tasks);
   const brain = new ProjectBrainService(authorization, filesystem, projects, brainSnapshots);
   const contextImpact = new ContextImpactService(brain, filesystem);
@@ -77,6 +83,8 @@ export function createRuntimeServices(database: Database.Database, databaseFilen
     projectDiscovery,
     tasks,
     commandRecipes,
+    git,
+    processes,
     skills,
     workspace,
     applyVerify,

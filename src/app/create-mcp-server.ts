@@ -7,6 +7,8 @@ import type { ApplyVerifyService } from './apply-verify-service.js';
 import type { CodingCycleService } from './coding-cycle-service.js';
 import { commandRecipeIdSchema, type CommandRecipeService } from './command-recipe-service.js';
 import type { ContextImpactService } from './context-impact-service.js';
+import type { GitService } from './git-service.js';
+import type { ManagedProcessService } from './managed-process-service.js';
 import { mcpToolCatalog } from './mcp-tool-catalog.js';
 import type { BrowserReviewResult, PreviewService } from './preview-service.js';
 import { HealthService } from './health-service.js';
@@ -26,6 +28,8 @@ export interface McpToolServices {
   readiness: ProjectReadinessService;
   tasks: TaskRunnerService;
   commandRecipes: CommandRecipeService;
+  git: GitService;
+  processes: ManagedProcessService;
   skills: SkillDiscoveryService;
   workspace: WorkspaceBootstrapService;
   applyVerify: ApplyVerifyService;
@@ -240,6 +244,90 @@ export function createMcpServer(services?: McpToolServices): McpServer {
       }));
     } catch (error) { return failed(error); }
   });
+
+  server.registerTool('process_profiles', {
+    title: 'List managed process profiles', description: 'Discover safe long-running package scripts such as dev/start/serve/preview/storybook/watch. No caller-controlled raw command is accepted.',
+    inputSchema: z.object(authShape).strict(), annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok({ processProfiles: await services.processes.profiles(authorized(input)) }); } catch (error) { return failed(error); } });
+
+  server.registerTool('process_list', {
+    title: 'List managed processes', description: 'List runtime-owned managed processes for one project with bounded redacted logs.',
+    inputSchema: z.object(authShape).strict(), annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok({ processes: await services.processes.list(authorized(input)) }); } catch (error) { return failed(error); } });
+
+  server.registerTool('process_start', {
+    title: 'Start managed process', description: 'Start one discovered long-running package process profile with sanitized environment and bounded log capture.',
+    inputSchema: z.object({ ...authShape, profile_id: z.string().min(1).max(160) }).strict(),
+    annotations: { readOnlyHint: false },
+  }, async (input) => { try { return ok(await services.processes.start({ ...authorized(input), profileId: input.profile_id })); } catch (error) { return failed(error); } });
+
+  server.registerTool('process_status', {
+    title: 'Managed process status', description: 'Read state, PID, exit data and bounded redacted logs for one runtime-owned process.',
+    inputSchema: z.object({ ...authShape, process_id: z.string().uuid() }).strict(), annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok(await services.processes.status({ ...authorized(input), processId: input.process_id })); } catch (error) { return failed(error); } });
+
+  server.registerTool('process_stop', {
+    title: 'Stop managed process', description: 'Stop one runtime-owned managed project process and its process tree.',
+    inputSchema: z.object({ ...authShape, process_id: z.string().uuid() }).strict(),
+    annotations: { readOnlyHint: false },
+  }, async (input) => { try { return ok(await services.processes.stop({ ...authorized(input), processId: input.process_id })); } catch (error) { return failed(error); } });
+
+  server.registerTool('git_status', {
+    title: 'Git status', description: 'Read structured local Git status only when the repository root exactly matches the registered project root.',
+    inputSchema: z.object(authShape).strict(), annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok(await services.git.status(authorized(input))); } catch (error) { return failed(error); } });
+
+  server.registerTool('git_diff', {
+    title: 'Git diff', description: 'Read a bounded local working-tree or staged diff with external diff disabled.',
+    inputSchema: z.object({ ...authShape, staged: z.boolean().default(false), paths: z.array(pathSchema).max(50).optional() }).strict(),
+    annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok(await services.git.diff({ ...authorized(input), staged: input.staged, ...(input.paths === undefined ? {} : { paths: input.paths }) })); } catch (error) { return failed(error); } });
+
+  server.registerTool('git_log', {
+    title: 'Git log', description: 'Read bounded structured local commit history.',
+    inputSchema: z.object({ ...authShape, limit: z.number().int().min(1).max(100).default(20) }).strict(), annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok(await services.git.log({ ...authorized(input), limit: input.limit })); } catch (error) { return failed(error); } });
+
+  server.registerTool('git_branches', {
+    title: 'Git branches', description: 'List local branches, current branch and upstream metadata.',
+    inputSchema: z.object(authShape).strict(), annotations: { readOnlyHint: true },
+  }, async (input) => { try { return ok(await services.git.branches(authorized(input))); } catch (error) { return failed(error); } });
+
+  server.registerTool('git_stage', {
+    title: 'Git stage paths', description: 'Stage validated project-relative paths. Git clean filters may execute, so git.write plus command.run are required.',
+    inputSchema: z.object({ ...authShape, paths: z.array(pathSchema).min(1).max(50) }).strict(),
+    annotations: { readOnlyHint: false },
+  }, async (input) => { try { return ok(await services.git.stage({ ...authorized(input), paths: input.paths })); } catch (error) { return failed(error); } });
+
+  server.registerTool('git_unstage', {
+    title: 'Git unstage paths', description: 'Unstage validated project-relative paths without changing working-tree content.',
+    inputSchema: z.object({ ...authShape, paths: z.array(pathSchema).min(1).max(50) }).strict(),
+    annotations: { readOnlyHint: false },
+  }, async (input) => { try { return ok(await services.git.unstage({ ...authorized(input), paths: input.paths })); } catch (error) { return failed(error); } });
+
+  server.registerTool('git_create_branch', {
+    title: 'Create Git branch', description: 'Create and switch to one validated local branch. Never touches remotes.',
+    inputSchema: z.object({ ...authShape, name: z.string().min(1).max(240) }).strict(),
+    annotations: { readOnlyHint: false },
+  }, async (input) => { try { return ok(await services.git.createBranch({ ...authorized(input), name: input.name })); } catch (error) { return failed(error); } });
+
+  server.registerTool('git_switch_branch', {
+    title: 'Switch Git branch', description: 'Switch to one validated existing local branch. Never touches remotes.',
+    inputSchema: z.object({ ...authShape, name: z.string().min(1).max(240) }).strict(),
+    annotations: { readOnlyHint: false },
+  }, async (input) => { try { return ok(await services.git.switchBranch({ ...authorized(input), name: input.name })); } catch (error) { return failed(error); } });
+
+  server.registerTool('git_commit', {
+    title: 'Git commit', description: 'Commit already-staged local changes with a bounded message. Repository hooks may execute; never pushes.',
+    inputSchema: z.object({ ...authShape, message: z.string().min(1).max(4000) }).strict(),
+    annotations: { readOnlyHint: false },
+  }, async (input) => { try { return ok(await services.git.commit({ ...authorized(input), message: input.message })); } catch (error) { return failed(error); } });
+
+  server.registerTool('git_restore_paths', {
+    title: 'Restore Git paths', description: 'Destructively restore validated project paths from Git. Requires filesystem.write, command.run and git.write.',
+    inputSchema: z.object({ ...authShape, paths: z.array(pathSchema).min(1).max(50), staged: z.boolean().default(false) }).strict(),
+    annotations: { readOnlyHint: false, destructiveHint: true },
+  }, async (input) => { try { return ok(await services.git.restorePaths({ ...authorized(input), paths: input.paths, staged: input.staged })); } catch (error) { return failed(error); } });
 
   server.registerTool('list_skills', {
     title: 'List project skills', description: 'Discover nested AGENTS, SKILL, prompt and rule files across common coding-agent formats including MCP/Agents/Codex/Claude/GitHub/Cursor/Cline/Roo/Windsurf/Continue.',

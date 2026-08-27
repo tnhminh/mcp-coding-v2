@@ -19,7 +19,7 @@ Updated: 2026-08-26
 - Structured application error model with safe public projection.
 - JSON logging with reserved-field isolation and sensitive-key redaction; generic internal error messages are not emitted raw.
 - Graceful/idempotent HTTP runtime close verified.
-- `npm run check`: lint + strict typecheck + 93 tests across 22 files + production build PASS; Audit/Usage, Control Center, tunnel, Auto Task Discovery + Verification Router V2, Agent Capability Enablement, Project Readiness Preflight and real MCP/browser regressions are covered.
+- `npm run check`: lint + strict typecheck + 101 tests across 25 files + production build PASS; Phase 1 Bridge capability gate, native Git runtime, managed process runtime, Audit/Usage, Control Center, tunnel, readiness and real MCP/browser regressions are covered.
 - Project aggregate and async repository interface designed for SQLite/PostgreSQL interchangeability.
 - SQLite persistence via `better-sqlite3` 13.0.3 with versioned transactional migration `001_projects`, foreign keys, busy timeout and WAL for file databases.
 - Project persistence verifies complete aggregate round-trip, case-insensitive alias uniqueness, update/delete behavior and JSON-only metadata.
@@ -54,7 +54,7 @@ Updated: 2026-08-26
 - Agent Capability Enablement (P4.5) is verified: MCP exposes `project_access_status`, bounded `project_guidance`, multi-file `read_files`, expanded common coding-agent instruction/skill discovery, every existing safe-name package.json script through structured `package.script`, and a workspace capability manifest. Runtime `tools/list` is regression-locked to the tool catalog.
 
 ## Active
-Agent Harness V1 — build the professional coding-agent harness over the verified local vibecode capability surface: execution context → planning/task decomposition → tool routing → autonomous implement/verify/review/fix loop → completion gate → persistent resume.
+Phase 2 - Skill Runtime V1: manifest/metadata normalization, applicability and activation rules, scoped composition, tool requirements, verification hooks and lifecycle integration over the completed Phase 1 Bridge.
 
 ## Known gaps
-Production identity/authentication and multi-user RBAC remain incomplete. Audit/Usage core is implemented, but richer actor identity, retention policy, metrics/traces/alerts, BM25/Git/task-aware retrieval, remaining Control Center Brain/Tasks/Git/Remote/Deploy surfaces and remote/deploy engines remain incomplete. Browser routing blocks client-side cross-origin HTTP/WebSocket egress, but a repository dev server explicitly authorized with `command.run` is still trusted host code and is not contained by an OS-level network sandbox. Git integration is deferred while local-project coding completeness is prioritized.
+Production identity/authentication and multi-user RBAC remain incomplete. Audit/Usage core is implemented, but richer actor identity, retention policy, metrics/traces/alerts, richer retrieval, Remote/Deploy surfaces and remote/deploy engines remain incomplete. Browser routing blocks client-side cross-origin HTTP/WebSocket egress, but authorized repository dev servers remain trusted host code without an OS-level network sandbox. Phase 1 intentionally exposes structured commands/process profiles rather than a caller-controlled raw shell.

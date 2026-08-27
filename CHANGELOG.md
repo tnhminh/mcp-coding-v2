@@ -1,4 +1,4 @@
-﻿# CHANGELOG
+# CHANGELOG
 
 ## 2026-08-25
 - Bootstrapped empty repository.
@@ -56,3 +56,4 @@
 - Added Auto Task Discovery + Verification Router V2: safe package-script aliases, package-manager lockfile detection, Rust/Go/Python/Maven/Gradle/.NET convention profiles, explicit `.mcp/tasks.json` override precedence, and built-in static `check` for `index.html` + local asset integrity.
 - Added Agent Capability Enablement P4.5: effective capability introspection, bounded multi-format project guidance, multi-file reads, all declared safe-name package scripts through structured execution, bootstrap capability/script manifest and exact MCP tool catalog/runtime parity. Full gate reached 21 files / 89 tests PASS.
 - Live `kpi3` smoke changed verification from zero task profiles to `check`; built-in static check PASS, preview/browser HTTP 200 with zero page errors, and external Google Fonts was intentionally blocked by same-origin Browser Review policy. Full gate reached 21 files / 88 tests PASS; build PASS and npm audit 0.
+- Phase 1 Bridge Finalization: added native project-scoped local Git runtime, runtime-owned managed process lifecycle, Git/Processes Control Center surfaces, shutdown cleanup and a machine-verifiable Phase 1 capability gate. Full gate: 25 files / 101 tests PASS.

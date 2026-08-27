@@ -72,7 +72,7 @@ export async function startHttpRuntime(config: AppConfig, logger: JsonLogger): P
     host: config.host,
     port: config.port,
   });
-  const controlCenter = new ControlCenterService(services.projects, services.permissionSessions, services.policies, services.aiJobs, services.previews, tunnel, autoStart, services.auditUsage, { ...config, databasePath: databaseFilename });
+  const controlCenter = new ControlCenterService(services.projects, services.permissionSessions, services.policies, services.aiJobs, services.previews, services.git, services.processes, tunnel, autoStart, services.auditUsage, { ...config, databasePath: databaseFilename });
   const mcpHandler = createMcpHandler(() => createMcpServer({
     authorization: services.authorization,
     filesystem: services.filesystem,
@@ -80,6 +80,8 @@ export async function startHttpRuntime(config: AppConfig, logger: JsonLogger): P
     readiness: services.readiness,
     tasks: services.tasks,
     commandRecipes: services.commandRecipes,
+    git: services.git,
+    processes: services.processes,
     skills: services.skills,
     workspace: services.workspace,
     applyVerify: services.applyVerify,
@@ -232,6 +234,57 @@ export async function startHttpRuntime(config: AppConfig, logger: JsonLogger): P
         writeJson(res, 200, { job: await controlCenter.cancelAiJob(decodeURIComponent(cancelAiJobMatch[1] ?? '')) });
         return;
       }
+      const projectGitStatusMatch = /^\/api\/projects\/([^/]+)\/git\/status$/u.exec(pathname);
+      if (projectGitStatusMatch && req.method === 'GET') {
+        writeJson(res, 200, { git: await controlCenter.gitStatus(decodeURIComponent(projectGitStatusMatch[1] ?? '')) });
+        return;
+      }
+      const projectGitLogMatch = /^\/api\/projects\/([^/]+)\/git\/log$/u.exec(pathname);
+      if (projectGitLogMatch && req.method === 'GET') {
+        const projectId = decodeURIComponent(projectGitLogMatch[1] ?? '');
+        const limitText = requestUrl.searchParams.get('limit');
+        const limit = limitText === null ? 20 : Number(limitText);
+        writeJson(res, 200, { gitLog: await controlCenter.gitLog(projectId, Number.isFinite(limit) ? limit : 20) });
+        return;
+      }
+      const projectGitBranchesMatch = /^\/api\/projects\/([^/]+)\/git\/branches$/u.exec(pathname);
+      if (projectGitBranchesMatch && req.method === 'GET') {
+        writeJson(res, 200, { gitBranches: await controlCenter.gitBranches(decodeURIComponent(projectGitBranchesMatch[1] ?? '')) });
+        return;
+      }
+      const projectProcessProfilesMatch = /^\/api\/projects\/([^/]+)\/process-profiles$/u.exec(pathname);
+      if (projectProcessProfilesMatch && req.method === 'GET') {
+        writeJson(res, 200, { processProfiles: await controlCenter.processProfiles(decodeURIComponent(projectProcessProfilesMatch[1] ?? '')) });
+        return;
+      }
+      const projectProcessesMatch = /^\/api\/projects\/([^/]+)\/processes$/u.exec(pathname);
+      if (projectProcessesMatch) {
+        const projectId = decodeURIComponent(projectProcessesMatch[1] ?? '');
+        if (req.method === 'GET') {
+          writeJson(res, 200, { processes: await controlCenter.listProcesses(projectId) });
+          return;
+        }
+        if (req.method === 'POST') {
+          writeJson(res, 201, { process: await controlCenter.startProcess(projectId, await readJsonBody(req)) });
+          return;
+        }
+      }
+      const projectProcessStatusMatch = /^\/api\/projects\/([^/]+)\/processes\/([^/]+)$/u.exec(pathname);
+      if (projectProcessStatusMatch && req.method === 'GET') {
+        writeJson(res, 200, { process: await controlCenter.processStatus(
+          decodeURIComponent(projectProcessStatusMatch[1] ?? ''),
+          decodeURIComponent(projectProcessStatusMatch[2] ?? ''),
+        ) });
+        return;
+      }
+      const projectProcessStopMatch = /^\/api\/projects\/([^/]+)\/processes\/([^/]+)\/stop$/u.exec(pathname);
+      if (projectProcessStopMatch && req.method === 'POST') {
+        writeJson(res, 200, { process: await controlCenter.stopProcess(
+          decodeURIComponent(projectProcessStopMatch[1] ?? ''),
+          decodeURIComponent(projectProcessStopMatch[2] ?? ''),
+        ) });
+        return;
+      }
       const previewProfilesMatch = /^\/api\/projects\/([^/]+)\/preview-profiles$/u.exec(pathname);
       if (previewProfilesMatch && req.method === 'GET') {
         writeJson(res, 200, { previewProfiles: await controlCenter.previewProfiles(decodeURIComponent(previewProfilesMatch[1] ?? '')) });
@@ -366,7 +419,10 @@ export async function startHttpRuntime(config: AppConfig, logger: JsonLogger): P
       });
     });
   } catch (error) {
-    await services.previews.closeAll().catch(() => undefined);
+    await Promise.all([
+      services.previews.closeAll().catch(() => undefined),
+      services.processes.closeAll().catch(() => undefined),
+    ]);
     database.close();
     await mcpHandler.close();
     throw error;
@@ -388,7 +444,7 @@ export async function startHttpRuntime(config: AppConfig, logger: JsonLogger): P
       const serverClosed = new Promise<void>((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));
       });
-      await Promise.all([serverClosed, mcpHandler.close(), services.previews.closeAll()]);
+      await Promise.all([serverClosed, mcpHandler.close(), services.previews.closeAll(), services.processes.closeAll()]);
       database.close();
       logger.info('http_stopped', 'HTTP runtime stopped');
     },
